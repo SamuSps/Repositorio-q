@@ -1,6 +1,8 @@
 import pandas as pd
 import sqlite3
 import os
+import tkinter as tk
+from tkinter import filedialog
 
 def importar_datos(ruta_archivo):
     """
@@ -41,24 +43,41 @@ def importar_datos(ruta_archivo):
             return None
 
         # Mostrar vista previa
-        print("\n Datos cargados correctamente. Vista previa:")
+        print("\nDatos cargados correctamente. Vista previa:")
         print(df.head())
 
         # Mostrar tipos de datos detectados
-        print("\n Tipos de datos detectados:")
+        print("\nTipos de datos detectados:")
         print(df.dtypes)
 
         return df
 
     except ValueError as e:
-        print(f" Error de formato o conversión: {e}")
+        print(f"Error de formato o conversión: {e}")
     except sqlite3.DatabaseError as e:
-        print(f" Error en la base de datos SQLite: {e}")
+        print(f"Error en la base de datos SQLite: {e}")
     except Exception as e:
-        print(f" Ocurrió un error inesperado: {e}")
+        print(f"Ocurrió un error inesperado: {e}")
 
     return None
 
+def seleccionar_archivo():
+    """
+    Abre un diálogo para seleccionar archivos CSV, Excel o SQLite.
+    """
+    root = tk.Tk()
+    root.withdraw()  # Oculta ventana principal
+    archivo = filedialog.askopenfilename(
+        title="Selecciona un archivo de datos",
+        filetypes=[
+            ("CSV", "*.csv"),
+            ("Excel", "*.xlsx *.xls"),
+            ("SQLite", "*.sqlite *.db"),
+            ("Todos", "*.*")
+        ]
+    )
+    root.destroy()
+    return archivo if archivo else None
 
 # === Ejemplo de uso ===
 if __name__ == "__main__":
