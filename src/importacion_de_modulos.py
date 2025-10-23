@@ -27,8 +27,6 @@ def importar_datos(ruta_archivo):
         elif extension in ['.sqlite', '.db']:
             print("Cargando datos desde base de datos SQLite...")
             conn = sqlite3.connect(ruta_archivo)
-
-            # Obtener el nombre de la tabla (asumiendo que solo hay una)
             tablas = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table';", conn)
             if tablas.empty:
                 print("Error: No se encontró ninguna tabla en la base de datos.")
@@ -66,7 +64,7 @@ def seleccionar_archivo():
     Abre un diálogo para seleccionar archivos CSV, Excel o SQLite.
     """
     root = tk.Tk()
-    root.withdraw()  # Oculta ventana principal
+    root.withdraw()
     archivo = filedialog.askopenfilename(
         title="Selecciona un archivo de datos",
         filetypes=[
@@ -79,9 +77,45 @@ def seleccionar_archivo():
     root.destroy()
     return archivo if archivo else None
 
+def detectar_nans(df):
+    """
+    Detecta valores NaN por columna y devuelve un resumen.
+    """
+    nans_por_columna = df.isna().sum()
+    total_nans = nans_por_columna.sum()
+    resumen = f"Valores inexistentes (NaN) encontrados: {total_nans}\n"
+    for col, count in nans_por_columna.items():
+        if count > 0:
+            resumen += f"- {col}: {count} NaN\n"
+    return resumen if total_nans > 0 else "No se encontraron valores inexistentes."
+
+def preprocesar_datos(df, metodo, columnas=None, valor_constante=None):
+    """
+    Preprocesa datos: elimina filas con NaN o rellena con media, mediana o constante.
+    """
+    if columnas:
+        df = df[columnas].copy()  # Trabaja solo con columnas seleccionadas
+    else:
+        df = df.copy()
+    
+    try:
+        if metodo == "eliminar":
+            df = df.dropna()
+        elif metodo == "media":
+            df = df.fillna(df.mean(numeric_only=True))
+        elif metodo == "mediana":
+            df = df.fillna(df.median(numeric_only=True))
+        elif metodo == "constante" and valor_constante is not None:
+            df = df.fillna(valor_constante)
+        else:
+            raise ValueError("Método o valor constante inválido.")
+        
+        return df
+    except Exception as e:
+        raise ValueError(f"Error en preprocesamiento: {str(e)}")
+
 # === Ejemplo de uso ===
 if __name__ == "__main__":
-    # Cambia esta ruta por el archivo que quieras probar
     rutas = [
         "C:/Users/Elena/Documents/UDC/2IA/Software/Repositorio-q/docs/housing.csv",
         "C:/Users/Elena/Documents/UDC/2IA/Software/Repositorio-q/docs/housing.xlsx",
@@ -90,4 +124,10 @@ if __name__ == "__main__":
 
     for ruta in rutas:
         print("\n" + "="*80)
-        importar_datos(ruta)
+        df = importar_datos(ruta)
+        if df is not None:
+            print(detectar_nans(df))
+            # Ejemplo de preprocesamiento
+            df_procesado = preprocesar_datos(df, "media")
+            print("\nDatos procesados (media):")
+            print(df_procesado.head())
