@@ -5,14 +5,34 @@ from importacion_de_modulos import (
     detectar_valores_faltantes, preprocesar_datos
 )
 import pandas as pd
+# --- NUEVO ---
+# Necesitamos esta librería para dividir los datos
+try:
+    from sklearn.model_selection import train_test_split
+except ImportError:
+    messagebox.showerror(
+        "Error de Dependencia", 
+        "No se encontró 'scikit-learn'.\nPor favor, instálalo con: pip install scikit-learn"
+    )
+    exit()
+# --- FIN NUEVO ---
+
 
 class AppPrincipal:
     def __init__(self, root):
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x750") # Modificado: Aumenté un poco la altura
         self.df = None
         self.df_procesado = None
+
+        # --- NUEVO ---
+        # Atributos para guardar los conjuntos de datos divididos
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        # --- FIN NUEVO ---
 
         self.crear_interfaz()
 
@@ -70,9 +90,48 @@ class AppPrincipal:
 
         self.btn_procesar = ttk.Button(frame_pre, text="Aplicar Preprocesado", command=self.aplicar_preprocesado)
         self.btn_procesar.grid(row=1, column=3, padx=10, pady=5)
+        
+        # --- NUEVO: Frame para la División de Datos ---
+        frame_division = ttk.LabelFrame(self.root, text="División de Datos (Train/Test)")
+        frame_division.pack(pady=10, fill="x", padx=20)
 
-        # Área de mensajes
-        self.text_mensajes = tk.Text(self.root, height=3, state="disabled", background="#f0f0f0")
+        # Slider para Test %
+        ttk.Label(frame_division, text="Porcentaje de Test:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        
+        self.test_split_var = tk.DoubleVar(value=20.0) # Variable para el slider
+        self.label_split_pct = ttk.Label(frame_division, text="20.0 %") # Etiqueta que muestra el valor
+        
+        # Función interna para actualizar la etiqueta del slider
+        def actualizar_label_split(valor):
+            self.label_split_pct.config(text=f"{float(valor):.1f} %")
+
+        self.slider_split = ttk.Scale(
+            frame_division, 
+            from_=5.0, # Mínimo 5% para test
+            to=50.0, # Máximo 50% para test
+            orient="horizontal", 
+            variable=self.test_split_var,
+            command=actualizar_label_split
+        )
+        self.slider_split.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.label_split_pct.grid(row=0, column=2, padx=5, pady=5)
+
+        # Semilla (Seed) para reproducibilidad
+        ttk.Label(frame_division, text="Semilla (Seed):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.seed_var = tk.StringVar(value="42") # Variable para la semilla
+        self.entry_seed = ttk.Entry(frame_division, textvariable=self.seed_var, width=10)
+        self.entry_seed.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # Botón Dividir
+        self.btn_dividir = ttk.Button(frame_division, text="Dividir Datos", command=self.aplicar_division)
+        self.btn_dividir.grid(row=1, column=3, padx=10, pady=5, sticky="e")
+        
+        frame_division.columnconfigure(1, weight=1) # Hacer que el slider se expanda
+        frame_division.columnconfigure(3, weight=1) # Hacer que el botón se alinee a la derecha
+        # --- FIN NUEVO ---
+
+        # Área de mensajes (MODIFICADO: altura)
+        self.text_mensajes = tk.Text(self.root, height=4, state="disabled", background="#f0f0f0")
         self.text_mensajes.pack(pady=10, fill="x", padx=20)
 
     def cargar_archivo(self):
@@ -86,6 +145,15 @@ class AppPrincipal:
         try:
             self.df = importar_datos(ruta)
             self.df_procesado = None
+            
+            # --- MODIFICADO ---
+            # Reseteamos los datos de train/test si se carga un nuevo archivo
+            self.X_train = None
+            self.X_test = None
+            self.y_train = None
+            self.y_test = None
+            # --- FIN MODIFICADO ---
+
             self.actualizar_tabla(self.df)
             self.actualizar_listboxes()
             self.mostrar_mensaje(f"Datos cargados: {self.df.shape[0]} filas, {self.df.shape[1]} columnas.")
@@ -129,6 +197,14 @@ class AppPrincipal:
                 raise ValueError("Selecciona una columna de salida (Target).")
             if not features:
                 raise ValueError("Selecciona al menos una columna de entrada (Features).")
+            
+            
+            # Reseteamos la división anterior, ya que los datos van a cambiar
+            self.X_train = None
+            self.X_test = None
+            self.y_train = None
+            self.y_test = None
+            # --- FIN MODIFICADO ---
 
             columnas = features + [target]
             self.df_procesado = preprocesar_datos(
@@ -141,6 +217,65 @@ class AppPrincipal:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
 
+    # --- NUEVO: Método para dividir los datos ---
+    def aplicar_division(self):
+        # 1. (Restricción) Verificar si los datos están procesados
+        if self.df_procesado is None:
+            messagebox.showwarning("Advertencia", "Primero debe aplicar el preprocesamiento de datos.")
+            self.mostrar_mensaje("Error: Datos no preprocesados.")
+            return
+
+        # 2. (Manejo de errores) Verificar si hay suficientes datos
+        if len(self.df_procesado) < 5:
+            messagebox.showerror("Error", "No hay suficientes datos para realizar la división (se requieren al menos 5 filas).")
+            self.mostrar_mensaje("Error: No hay suficientes datos.")
+            return
+
+        try:
+            # 3. Obtener parámetros de la UI
+            test_size_pct = self.test_split_var.get()
+            test_size_float = test_size_pct / 100.0
+
+            seed_str = self.seed_var.get()
+            if not seed_str.isdigit() or seed_str == "":
+                self.seed_var.set("42") # Valor por defecto si está vacío
+                seed = 42
+            else:
+                seed = int(seed_str)
+
+            # 4. Obtener features y target (ya seleccionados en preprocesado)
+            features = self.obtener_features()
+            target = self.obtener_target()
+            
+            # Esto no debería pasar si df_procesado existe, pero por si acaso.
+            if not target or not features:
+                messagebox.showerror("Error", "Asegúrese de tener features y target seleccionados.")
+                return
+
+            X = self.df_procesado[features]
+            y = self.df_procesado[target]
+
+            # 5. (Separación) Realizar la división
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+                X, y, 
+                test_size=test_size_float, 
+                random_state=seed # (Reproducibilidad)
+            )
+
+            # 6. (Visualización) Mostrar confirmación y tamaños
+            msg_total = f"Datos divididos correctamente (Semilla={seed})."
+            msg_train = f"Conjunto de Entrenamiento: {len(self.X_train)} filas."
+            msg_test = f"Conjunto de Test: {len(self.X_test)} filas."
+            
+            self.mostrar_mensaje(f"{msg_total}\n{msg_train}\n{msg_test}")
+            
+            # (DoD) Los conjuntos quedan almacenados en self.X_train, self.X_test, etc.
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.mostrar_mensaje(f"Error en la división: {str(e)}")
+    
+
     def obtener_features(self):
         seleccion = self.listbox_features.curselection()
         return [self.listbox_features.get(i) for i in seleccion]
@@ -151,8 +286,10 @@ class AppPrincipal:
 
     def mostrar_mensaje(self, texto):
         self.text_mensajes.config(state="normal")
-        self.text_mensajes.delete("1.0", tk.END)
-        self.text_mensajes.insert(tk.END, texto)
+        # --- MODIFICADO: Insertar al principio para ver el último mensaje ---
+        self.text_mensajes.delete("1.0", tk.END) 
+        self.text_mensajes.insert("1.0", texto)
+        # --- FIN MODIFICADO ---
         self.text_mensajes.config(state="disabled")
 
 # === INICIO DE LA APLICACIÓN ===
