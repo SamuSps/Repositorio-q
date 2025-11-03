@@ -6,6 +6,7 @@ Bienvenido al repositorio. Sigue estas normas para colaborar efectivamente.
 - Trabaja siempre en ramas propias, no en main directamente.
 - Mantén el código limpio y comentado.
 - No subas archivos grandes o sensibles (usa .gitignore).
+-Revisa la documentación antes de hacer cambios importantes
 
 ## Estilo de Mensajes de Commit
 - Usa mensajes descriptivos en español o inglés.
@@ -15,12 +16,14 @@ Bienvenido al repositorio. Sigue estas normas para colaborar efectivamente.
 ## Procedimiento para Modificar README o Documentación
 - Crea una rama: `git checkout -b docs/actualizacion-readme`.
 - Edita el archivo.
-- Commit: `git add README.md` y `git commit -m "docs: Actualizar descripción en README"`.
-- Push: `git push origin docs/actualizacion-readme`.
+- Guarda tus cambios y haz commit: `git add README.md` y `git commit -m "docs: Actualizar descripción en README"`.
+-ENvía tus datos al repositorio remoto con push: `git push origin docs/actualizacion-readme`.
 - Crea un Pull Request en GitHub para revisión.
 
 ## Flujo de Trabajo Colaborativo
-1. Clona el repo y actualízalo: `git pull origin main`.
+1. Clona el repositorio y actualízalo:
+ `git clone <URL_DEL_REPO>`
+ `git pull origin main`.
 2. Crea una rama: `git checkout -b nombre-rama` (e.g., feature/nueva-funcion).
 3. Trabaja y haz commits frecuentes.
 4. Push la rama: `git push origin nombre-rama`.
@@ -28,5 +31,5 @@ Bienvenido al repositorio. Sigue estas normas para colaborar efectivamente.
 6. Asigna revisores (compañeros) para que comenten y aprueben.
 7. Fusiona (merge) el PR una vez aprobado.
 8. Elimina la rama remota si ya no se necesita.
-
+`git push origin --delete feature/nueva-funcion`
 ¡Gracias por contribuir!
