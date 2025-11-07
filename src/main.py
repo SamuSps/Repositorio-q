@@ -168,7 +168,11 @@ class AppPrincipal:
         for col in df.columns:
             self.tabla.heading(col, text=col)
             self.tabla.column(col, width=120, anchor="center")
-        for _, row in df.head(1000).iterrows():
+        
+        # --- MODIFICACIÓN ---
+        # Quitado .head(1000) para iterar sobre TODAS las filas del dataframe
+        for _, row in df.iterrows():
+        # --- FIN MODIFICACIÓN ---
             self.tabla.insert("", "end", values=[str(v) for v in row])
 
     def actualizar_listboxes(self):
