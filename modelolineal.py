@@ -73,15 +73,22 @@ print(f"Intersección: {model.intercept_:.2f}")
 print(f"Error cuadrático medio (MSE): {mse:.2f}")
 print(f"Coeficiente de determinación (R²): {r2:.2f}")
 
-# ==============================================
-# 8. Visualización del ajuste
-# ==============================================
+# ==============================
+# 8. Visualización optimizada
+# ==============================
+# Tomar una muestra de 1000 puntos (o menos si el test es más pequeño)
+sample = X_test.join(y_test).sample(min(1000, len(X_test)), random_state=42)
+
 plt.figure(figsize=(8, 5))
-plt.scatter(X_test, y_test, color="blue", alpha=0.5, label="Datos reales")
-plt.plot(X_test, y_pred, color="red", linewidth=2, label="Predicción (modelo lineal)")
+plt.scatter(sample['median_income'], sample['median_house_value'], 
+            color="blue", alpha=0.5, label="Datos reales")
+# Predicción de la muestra
+y_pred_sample = model.predict(sample[['median_income']])
+plt.plot(sample['median_income'], y_pred_sample, color="red", linewidth=2, label="Predicción (modelo lineal)")
 plt.title("Regresión Lineal: Ingreso medio vs Valor medio de vivienda")
 plt.xlabel("Ingreso medio (median_income)")
 plt.ylabel("Valor medio de la vivienda (median_house_value)")
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.show()  
+
