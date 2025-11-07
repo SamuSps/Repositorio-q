@@ -5,49 +5,96 @@ from importacion_de_modulos import (
     detectar_valores_faltantes, preprocesar_datos
 )
 import pandas as pd
-# --- NUEVO ---
-# Necesitamos esta librería para dividir los datos
+
+# --- MODIFICADO: Añadir más importaciones ---
 try:
     from sklearn.model_selection import train_test_split
-except ImportError:
+    # --- NUEVO ---
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, r2_score
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+    import numpy as np
+    # --- FIN NUEVO ---
+
+except ImportError as e:
     messagebox.showerror(
         "Error de Dependencia", 
-        "No se encontró 'scikit-learn'.\nPor favor, instálalo con: pip install scikit-learn"
+        f"No se encontró una librería necesaria: {e}.\nPor favor, instálala (ej: pip install scikit-learn matplotlib)"
     )
     exit()
-# --- FIN NUEVO ---
+# --- FIN MODIFICADO ---
 
 
 class AppPrincipal:
     def __init__(self, root):
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
-        self.root.geometry("1000x750") # Modificado: Aumenté un poco la altura
+        # --- MODIFICADO: Aumentado tamaño para el gráfico ---
+        self.root.geometry("1200x900")
+        # --- FIN MODIFICADO ---
+        
         self.df = None
         self.df_procesado = None
 
-        # --- NUEVO ---
         # Atributos para guardar los conjuntos de datos divididos
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
+        
+        # --- NUEVO ---
+        # Atributos para el modelo y el gráfico
+        self.model = None
+        self.canvas_widget = None
+        self.toolbar_widget = None
+        # --- NUEVO ---
+        self.canvas = None
+        self.scrollable_frame = None
+        self.scrollable_frame_window = None
         # --- FIN NUEVO ---
 
         self.crear_interfaz()
 
     def crear_interfaz(self):
+        # --- NUEVO: Contenedor principal para scroll ---
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        self.scrollable_frame_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Binds para que el scroll funcione
+        self.scrollable_frame.bind("<Configure>", self.on_frame_configure)
+        self.canvas.bind("<Configure>", self.on_canvas_configure)
+        # --- FIN NUEVO ---
+
+
         # === 1. Botón Abrir Archivo (arriba) ===
-        self.btn_abrir = ttk.Button(self.root, text="Abrir Archivo", command=self.cargar_archivo)
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        self.btn_abrir = ttk.Button(self.scrollable_frame, text="Abrir Archivo", command=self.cargar_archivo)
         self.btn_abrir.pack(pady=10, anchor="center")
 
         # === 2. Ruta del archivo ===
-        self.label_ruta = ttk.Label(self.root, text="Ruta: Ningún archivo seleccionado", foreground="gray")
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        self.label_ruta = ttk.Label(self.scrollable_frame, text="Ruta: Ningún archivo seleccionado", foreground="gray")
         self.label_ruta.pack(pady=5, fill="x", padx=20)
 
         # === 3. Tabla con scroll ===
-        frame_tabla = ttk.Frame(self.root)
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        frame_tabla = ttk.Frame(self.scrollable_frame)
+        # --- MODIFICADO: Reducido el 'expand' para dar espacio al gráfico y corregido error de 'minsize' ---
         frame_tabla.pack(pady=10, fill="both", expand=True, padx=20)
+        # --- FIN MODIFICADO ---
 
         self.tabla = ttk.Treeview(frame_tabla, show="headings")
         scroll_y = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla.yview)
@@ -59,7 +106,8 @@ class AppPrincipal:
         self.tabla.pack(fill="both", expand=True)
 
         # === 4. Selección de columnas (debajo de la tabla) ===
-        frame_seleccion = ttk.Frame(self.root)
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        frame_seleccion = ttk.Frame(self.scrollable_frame)
         frame_seleccion.pack(pady=10, fill="x", padx=20)
 
         # Izquierda: Features
@@ -77,9 +125,10 @@ class AppPrincipal:
         self.listbox_target.pack(fill="both", expand=True, padx=5, pady=5)
 
         # === 5. Preprocesamiento ===
-        frame_pre = ttk.LabelFrame(self.root, text="Preprocesamiento de Valores Faltantes")
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        frame_pre = ttk.LabelFrame(self.scrollable_frame, text="Preprocesamiento de Valores Faltantes")
         frame_pre.pack(pady=10, fill="x", padx=20)
-
+        # ... (código de radio buttons y entry sin cambios) ...
         self.metodo_var = tk.StringVar(value="eliminar")
         ttk.Radiobutton(frame_pre, text="Eliminar filas", variable=self.metodo_var, value="eliminar").grid(row=0, column=0, padx=5, pady=5)
         ttk.Radiobutton(frame_pre, text="Rellenar con Media", variable=self.metodo_var, value="media").grid(row=0, column=1, padx=5, pady=5)
@@ -87,51 +136,77 @@ class AppPrincipal:
         ttk.Radiobutton(frame_pre, text="Rellenar con Valor:", variable=self.metodo_var, value="constante").grid(row=1, column=0, padx=5, pady=5)
         self.entry_constante = ttk.Entry(frame_pre, width=10)
         self.entry_constante.grid(row=1, column=1, padx=5, pady=5)
-
         self.btn_procesar = ttk.Button(frame_pre, text="Aplicar Preprocesado", command=self.aplicar_preprocesado)
         self.btn_procesar.grid(row=1, column=3, padx=10, pady=5)
         
-        # --- NUEVO: Frame para la División de Datos ---
-        frame_division = ttk.LabelFrame(self.root, text="División de Datos (Train/Test)")
+        # === 6. Frame para la División de Datos ===
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        frame_division = ttk.LabelFrame(self.scrollable_frame, text="División de Datos (Train/Test)")
         frame_division.pack(pady=10, fill="x", padx=20)
-
-        # Slider para Test %
+        # ... (código de slider y seed sin cambios) ...
         ttk.Label(frame_division, text="Porcentaje de Test:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        
-        self.test_split_var = tk.DoubleVar(value=20.0) # Variable para el slider
-        self.label_split_pct = ttk.Label(frame_division, text="20.0 %") # Etiqueta que muestra el valor
-        
-        # Función interna para actualizar la etiqueta del slider
+        self.test_split_var = tk.DoubleVar(value=20.0) 
+        self.label_split_pct = ttk.Label(frame_division, text="20.0 %")
         def actualizar_label_split(valor):
             self.label_split_pct.config(text=f"{float(valor):.1f} %")
-
         self.slider_split = ttk.Scale(
-            frame_division, 
-            from_=5.0, # Mínimo 5% para test
-            to=50.0, # Máximo 50% para test
-            orient="horizontal", 
-            variable=self.test_split_var,
-            command=actualizar_label_split
+            frame_division, from_=5.0, to=50.0, orient="horizontal", 
+            variable=self.test_split_var, command=actualizar_label_split
         )
         self.slider_split.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.label_split_pct.grid(row=0, column=2, padx=5, pady=5)
-
-        # Semilla (Seed) para reproducibilidad
         ttk.Label(frame_division, text="Semilla (Seed):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.seed_var = tk.StringVar(value="42") # Variable para la semilla
+        self.seed_var = tk.StringVar(value="42")
         self.entry_seed = ttk.Entry(frame_division, textvariable=self.seed_var, width=10)
         self.entry_seed.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-
-        # Botón Dividir
         self.btn_dividir = ttk.Button(frame_division, text="Dividir Datos", command=self.aplicar_division)
         self.btn_dividir.grid(row=1, column=3, padx=10, pady=5, sticky="e")
+        frame_division.columnconfigure(1, weight=1) 
+        frame_division.columnconfigure(3, weight=1)
         
-        frame_division.columnconfigure(1, weight=1) # Hacer que el slider se expanda
-        frame_division.columnconfigure(3, weight=1) # Hacer que el botón se alinee a la derecha
+        # --- NUEVO: Frame para Creación y Evaluación del Modelo ---
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        frame_modelo_main = ttk.LabelFrame(self.scrollable_frame, text="Creación y Evaluación del Modelo")
+        frame_modelo_main.pack(pady=10, fill="both", expand=True, padx=20)
+
+        # Configurar grid de 2 columnas: Controles (0) y Resultados (1)
+        frame_modelo_main.rowconfigure(0, weight=1)
+        frame_modelo_main.columnconfigure(1, weight=1)
+
+        # Columna 0: Controles
+        frame_controles_modelo = ttk.Frame(frame_modelo_main)
+        frame_controles_modelo.grid(row=0, column=0, padx=10, pady=10, sticky="ns")
+
+        self.btn_crear_modelo = ttk.Button(frame_controles_modelo, text="Crear Modelo", command=self.crear_modelo)
+        self.btn_crear_modelo.pack(pady=10)
+
+        # Columna 1: Resultados (Gráfico, Fórmula, Métricas)
+        frame_resultados = ttk.Frame(frame_modelo_main)
+        frame_resultados.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        frame_resultados.rowconfigure(0, weight=1) # El gráfico se expande
+        frame_resultados.columnconfigure(0, weight=1)
+
+        # Sub-Frame para el Gráfico
+        self.frame_plot = ttk.Frame(frame_resultados, relief="sunken", borderwidth=1)
+        self.frame_plot.grid(row=0, column=0, sticky="nsew")
+        ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
+
+        # Sub-Frame para Fórmula y Métricas
+        frame_texto_resultados = ttk.Frame(frame_resultados)
+        frame_texto_resultados.grid(row=1, column=0, sticky="ew", pady=10)
+
+        self.label_formula = ttk.Label(frame_texto_resultados, text="Fórmula: N/A", font=("TkDefaultFont", 10, "bold"), wraplength=700, justify="left")
+        self.label_formula.pack(anchor="w")
+
+        self.label_metrics = ttk.Label(frame_texto_resultados, text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A", justify="left")
+        self.label_metrics.pack(anchor="w", pady=5)
         # --- FIN NUEVO ---
 
-        # Área de mensajes (MODIFICADO: altura)
-        self.text_mensajes = tk.Text(self.root, height=4, state="disabled", background="#f0f0f0")
+
+        # Área de mensajes (MODIFICADO: movido al final)
+        # --- MODIFICADO: Padre es self.scrollable_frame ---
+        self.text_mensajes = tk.Text(self.scrollable_frame, height=4, state="disabled", background="#f0f0f0")
         self.text_mensajes.pack(pady=10, fill="x", padx=20)
 
     def cargar_archivo(self):
@@ -146,13 +221,15 @@ class AppPrincipal:
             self.df = importar_datos(ruta)
             self.df_procesado = None
             
-            # --- MODIFICADO ---
-            # Reseteamos los datos de train/test si se carga un nuevo archivo
+            # Reseteamos los datos de train/test
             self.X_train = None
             self.X_test = None
             self.y_train = None
             self.y_test = None
-            # --- FIN MODIFICADO ---
+            
+            # --- NUEVO ---
+            self.resetar_resultados_modelo()
+            # --- FIN NUEVO ---
 
             self.actualizar_tabla(self.df)
             self.actualizar_listboxes()
@@ -163,19 +240,17 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error: {str(e)}")
 
     def actualizar_tabla(self, df):
+        # ... (código sin cambios) ...
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
         for col in df.columns:
             self.tabla.heading(col, text=col)
             self.tabla.column(col, width=120, anchor="center")
-        
-        # --- MODIFICACIÓN ---
-        # Quitado .head(1000) para iterar sobre TODAS las filas del dataframe
         for _, row in df.iterrows():
-        # --- FIN MODIFICACIÓN ---
             self.tabla.insert("", "end", values=[str(v) for v in row])
 
     def actualizar_listboxes(self):
+        # ... (código sin cambios) ...
         if self.df is None:
             return
         columnas = list(self.df.columns)
@@ -202,13 +277,15 @@ class AppPrincipal:
             if not features:
                 raise ValueError("Selecciona al menos una columna de entrada (Features).")
             
-            
-            # Reseteamos la división anterior, ya que los datos van a cambiar
+            # Reseteamos la división anterior
             self.X_train = None
             self.X_test = None
             self.y_train = None
             self.y_test = None
-            # --- FIN MODIFICADO ---
+            
+            # --- NUEVO ---
+            self.resetar_resultados_modelo()
+            # --- FIN NUEVO ---
 
             columnas = features + [target]
             self.df_procesado = preprocesar_datos(
@@ -221,37 +298,26 @@ class AppPrincipal:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
 
-    # --- NUEVO: Método para dividir los datos ---
     def aplicar_division(self):
-        # 1. (Restricción) Verificar si los datos están procesados
         if self.df_procesado is None:
             messagebox.showwarning("Advertencia", "Primero debe aplicar el preprocesamiento de datos.")
-            self.mostrar_mensaje("Error: Datos no preprocesados.")
             return
-
-        # 2. (Manejo de errores) Verificar si hay suficientes datos
         if len(self.df_procesado) < 5:
             messagebox.showerror("Error", "No hay suficientes datos para realizar la división (se requieren al menos 5 filas).")
-            self.mostrar_mensaje("Error: No hay suficientes datos.")
             return
 
         try:
-            # 3. Obtener parámetros de la UI
+            # --- NUEVO ---
+            self.resetar_resultados_modelo()
+            # --- FIN NUEVO ---
+            
             test_size_pct = self.test_split_var.get()
             test_size_float = test_size_pct / 100.0
+            seed = int(self.seed_var.get()) if self.seed_var.get().isdigit() else 42
+            if self.seed_var.get() == "": self.seed_var.set("42")
 
-            seed_str = self.seed_var.get()
-            if not seed_str.isdigit() or seed_str == "":
-                self.seed_var.set("42") # Valor por defecto si está vacío
-                seed = 42
-            else:
-                seed = int(seed_str)
-
-            # 4. Obtener features y target (ya seleccionados en preprocesado)
             features = self.obtener_features()
             target = self.obtener_target()
-            
-            # Esto no debería pasar si df_procesado existe, pero por si acaso.
             if not target or not features:
                 messagebox.showerror("Error", "Asegúrese de tener features y target seleccionados.")
                 return
@@ -259,45 +325,218 @@ class AppPrincipal:
             X = self.df_procesado[features]
             y = self.df_procesado[target]
 
-            # 5. (Separación) Realizar la división
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-                X, y, 
-                test_size=test_size_float, 
-                random_state=seed # (Reproducibilidad)
+                X, y, test_size=test_size_float, random_state=seed
             )
 
-            # 6. (Visualización) Mostrar confirmación y tamaños
             msg_total = f"Datos divididos correctamente (Semilla={seed})."
             msg_train = f"Conjunto de Entrenamiento: {len(self.X_train)} filas."
             msg_test = f"Conjunto de Test: {len(self.X_test)} filas."
-            
             self.mostrar_mensaje(f"{msg_total}\n{msg_train}\n{msg_test}")
-            
-            # (DoD) Los conjuntos quedan almacenados en self.X_train, self.X_test, etc.
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error en la división: {str(e)}")
     
 
+    # --- NUEVO: Métodos para el Modelo ---
+
+    def crear_modelo(self):
+        """
+        Inicia el proceso de creación del modelo, cálculo de métricas y gráfico.
+        """
+        # (CA: Prerrequisitos)
+        if self.X_train is None or self.y_train is None:
+            messagebox.showwarning("Advertencia", "Primero debe dividir los datos en conjuntos de entrenamiento y test.")
+            self.mostrar_mensaje("Error: Datos no divididos.")
+            return
+            
+        try:
+            # (CA: Ajustar solo con entrenamiento)
+            self.model = LinearRegression()
+            self.model.fit(self.X_train, self.y_train)
+            
+            self.mostrar_mensaje("Modelo creado y entrenado exitosamente.")
+            
+            # (CA: Fórmula y Métricas)
+            self.actualizar_resultados_modelo()
+            
+            # (CA: Gráfico)
+            self.actualizar_grafico()
+
+        except Exception as e:
+            messagebox.showerror("Error al crear modelo", str(e))
+            self.mostrar_mensaje(f"Error: {str(e)}")
+
+    def actualizar_resultados_modelo(self):
+        """
+        Calcula y muestra la fórmula y las métricas (R² y ECM) del modelo.
+        """
+        if self.model is None:
+            return
+
+        features = self.obtener_features()
+        target = self.obtener_target()
+        
+        # --- (CA: Fórmula) ---
+        try:
+            intercept = self.model.intercept_
+            coefs = self.model.coef_
+            
+            formula_str = f"{target} = "
+            for i, (feat, coef) in enumerate(zip(features, coefs)):
+                signo = "+" if i > 0 and coef >= 0 else ""
+                formula_str += f" {signo} ({coef:.4f} * {feat})"
+            
+            signo_intercept = "+" if intercept >= 0 else ""
+            formula_str += f" {signo_intercept} {intercept:.4f}"
+            
+            self.label_formula.config(text=f"Fórmula: {formula_str}")
+        except Exception as e:
+            self.label_formula.config(text=f"Fórmula: Error al generar - {e}")
+
+        # --- (CA: Métricas) ---
+        try:
+            # Evaluar en Entrenamiento
+            y_train_pred = self.model.predict(self.X_train)
+            train_r2 = r2_score(self.y_train, y_train_pred)
+            train_mse = mean_squared_error(self.y_train, y_train_pred)
+            
+            # Evaluar en Test
+            y_test_pred = self.model.predict(self.X_test)
+            test_r2 = r2_score(self.y_test, y_test_pred)
+            test_mse = mean_squared_error(self.y_test, y_test_pred)
+
+            metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
+            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
+            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
+            
+            self.label_metrics.config(text=metrics_str)
+            
+        except Exception as e:
+            self.label_metrics.config(text=f"Métricas: Error al calcular - {e}")
+
+
+    def actualizar_grafico(self):
+        """
+        Crea o actualiza el gráfico de Matplotlib en la interfaz.
+        """
+        # Limpiar gráfico anterior
+        if self.canvas_widget:
+            self.canvas_widget.destroy()
+        if self.toolbar_widget:
+            self.toolbar_widget.destroy()
+        for widget in self.frame_plot.winfo_children():
+            widget.destroy()
+
+        features = self.obtener_features()
+        target = self.obtener_target()
+
+        # (CA: Condición de gráfico)
+        if len(features) > 1:
+            ttk.Label(self.frame_plot, text="No se puede graficar: Múltiples features (entradas).\nEl modelo fue creado, pero no es visualizable en 2D.").pack(padx=10, pady=10)
+            self.mostrar_mensaje("Gráfico no generado (múltiples features).")
+            return
+            
+        try:
+            fig = Figure(figsize=(6, 4), dpi=100)
+            ax = fig.add_subplot(111)
+
+            feature_name = features[0]
+            
+            # (CA: Puntos de Entrenamiento y Test)
+            ax.scatter(self.X_train[feature_name], self.y_train, color='blue', label='Entrenamiento', alpha=0.7)
+            ax.scatter(self.X_test[feature_name], self.y_test, color='red', label='Test', alpha=0.7)
+
+            # (CA: Recta de Ajuste)
+            # Crear una línea suave para la predicción
+            X_all_series = pd.concat([self.X_train[feature_name], self.X_test[feature_name]])
+            X_line = np.linspace(X_all_series.min(), X_all_series.max(), 100).reshape(-1, 1)
+            
+            # Predecir sobre la línea (hay que pasar un DataFrame con el nombre correcto)
+            X_line_df = pd.DataFrame(X_line, columns=[feature_name])
+            y_line = self.model.predict(X_line_df)
+            
+            ax.plot(X_line, y_line, color='green', linewidth=3, label='Recta de Regresión')
+
+            ax.set_xlabel(feature_name)
+            ax.set_ylabel(target)
+            ax.set_title("Regresión Lineal: Ajuste del Modelo")
+            ax.legend()
+            ax.grid(True)
+            fig.tight_layout()
+
+            # Incrustar gráfico en Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=self.frame_plot)
+            self.canvas_widget = canvas.get_tk_widget()
+            self.canvas_widget.pack(fill='both', expand=True)
+
+            toolbar = NavigationToolbar2Tk(canvas, self.frame_plot)
+            toolbar.update()
+            self.toolbar_widget = toolbar
+            self.toolbar_widget.pack(side='bottom', fill='x')
+
+            canvas.draw()
+            
+        except Exception as e:
+            ttk.Label(self.frame_plot, text=f"Error al generar gráfico: {e}").pack(padx=10, pady=10)
+            self.mostrar_mensaje(f"Error al graficar: {e}")
+
+
+    def resetar_resultados_modelo(self):
+        """
+        Limpia la GUI de los resultados del modelo (fórmula, métricas y gráfico).
+        """
+        self.model = None
+        self.label_formula.config(text="Fórmula: N/A")
+        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
+        
+        if self.canvas_widget:
+            self.canvas_widget.destroy()
+            self.canvas_widget = None
+        if self.toolbar_widget:
+            self.toolbar_widget.destroy()
+            self.toolbar_widget = None
+            
+        for widget in self.frame_plot.winfo_children():
+            widget.destroy()
+            
+        ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
+    
+    # --- FIN NUEVO ---
+
     def obtener_features(self):
+        # ... (código sin cambios) ...
         seleccion = self.listbox_features.curselection()
         return [self.listbox_features.get(i) for i in seleccion]
 
     def obtener_target(self):
+        # ... (código sin cambios) ...
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
     def mostrar_mensaje(self, texto):
+        # ... (código sin cambios) ...
         self.text_mensajes.config(state="normal")
-        # --- MODIFICADO: Insertar al principio para ver el último mensaje ---
         self.text_mensajes.delete("1.0", tk.END) 
         self.text_mensajes.insert("1.0", texto)
         # --- FIN MODIFICADO ---
         self.text_mensajes.config(state="disabled")
+
+    # --- NUEVOS MÉTODOS PARA EL SCROLL ---
+    def on_frame_configure(self, event=None):
+        """Actualiza la región de scroll del canvas."""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def on_canvas_configure(self, event=None):
+        """Ajusta el ancho del frame interior al ancho del canvas."""
+        if self.scrollable_frame_window:
+            self.canvas.itemconfig(self.scrollable_frame_window, width=event.width)
+    # --- FIN NUEVOS MÉTODOS ---
 
 # === INICIO DE LA APLICACIÓN ===
 if __name__ == "__main__":
     root = tk.Tk()
     app = AppPrincipal(root)
     root.mainloop()
+    
