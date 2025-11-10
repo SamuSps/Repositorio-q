@@ -49,10 +49,13 @@ class AppPrincipal:
         self.model = None
         self.canvas_widget = None
         self.toolbar_widget = None
-        # --- NUEVO ---
+        # --- FIN NUEVO ---
         self.canvas = None
         self.scrollable_frame = None
         self.scrollable_frame_window = None
+
+        # --- NUEVO: Descripción del modelo ---
+        self.descripcion_modelo = ""
         # --- FIN NUEVO ---
 
         self.crear_interfaz()
@@ -180,6 +183,26 @@ class AppPrincipal:
         self.btn_crear_modelo = ttk.Button(frame_controles_modelo, text="Crear Modelo", command=self.crear_modelo)
         self.btn_crear_modelo.pack(pady=10)
 
+        # --- NUEVO: Área de texto para descripción del modelo ---
+        frame_desc = ttk.LabelFrame(frame_controles_modelo, text="Descripción del Modelo (Opcional)")
+        frame_desc.pack(pady=10, fill="both", expand=True)
+
+        self.text_descripcion = tk.Text(frame_desc, height=6, wrap="word", font=("TkDefaultFont", 9))
+        self.text_descripcion.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Scrollbar para el textarea
+        scroll_desc = ttk.Scrollbar(frame_desc, command=self.text_descripcion.yview)
+        scroll_desc.pack(side="right", fill="y")
+        self.text_descripcion.config(yscrollcommand=scroll_desc.set)
+
+        # Etiqueta informativa
+        ttk.Label(
+            frame_desc,
+            text="Describe el propósito o características del modelo, etc.",
+            foreground="gray", font=("TkDefaultFont", 8, "italic")
+        ).pack(anchor="w", padx=5, pady=(0, 5))
+        # --- FIN NUEVO ---
+
         # Columna 1: Resultados (Gráfico, Fórmula, Métricas)
         frame_resultados = ttk.Frame(frame_modelo_main)
         frame_resultados.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
@@ -240,7 +263,6 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error: {str(e)}")
 
     def actualizar_tabla(self, df):
-        # ... (código sin cambios) ...
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
         for col in df.columns:
@@ -250,7 +272,6 @@ class AppPrincipal:
             self.tabla.insert("", "end", values=[str(v) for v in row])
 
     def actualizar_listboxes(self):
-        # ... (código sin cambios) ...
         if self.df is None:
             return
         columnas = list(self.df.columns)
@@ -350,13 +371,19 @@ class AppPrincipal:
             messagebox.showwarning("Advertencia", "Primero debe dividir los datos en conjuntos de entrenamiento y test.")
             self.mostrar_mensaje("Error: Datos no divididos.")
             return
+
+        # --- NUEVO: Leer descripción ---
+        descripcion = self.obtener_descripcion()
+        if not descripcion:
+            self.mostrar_mensaje("Modelo creado sin descripción (opcional).")
+        else:
+            self.mostrar_mensaje(f"Modelo creado. Descripción guardada ({len(descripcion)} caracteres).")
+        # --- FIN NUEVO ---
             
         try:
             # (CA: Ajustar solo con entrenamiento)
             self.model = LinearRegression()
             self.model.fit(self.X_train, self.y_train)
-            
-            self.mostrar_mensaje("Modelo creado y entrenado exitosamente.")
             
             # (CA: Fórmula y Métricas)
             self.actualizar_resultados_modelo()
@@ -415,7 +442,6 @@ class AppPrincipal:
             
         except Exception as e:
             self.label_metrics.config(text=f"Métricas: Error al calcular - {e}")
-
 
     def actualizar_grafico(self):
         """
@@ -482,10 +508,9 @@ class AppPrincipal:
             ttk.Label(self.frame_plot, text=f"Error al generar gráfico: {e}").pack(padx=10, pady=10)
             self.mostrar_mensaje(f"Error al graficar: {e}")
 
-
     def resetar_resultados_modelo(self):
         """
-        Limpia la GUI de los resultados del modelo (fórmula, métricas y gráfico).
+        Limpia la GUI de los resultados del modelo (fórmula, métricas, gráfico y descripción).
         """
         self.model = None
         self.label_formula.config(text="Fórmula: N/A")
@@ -502,25 +527,42 @@ class AppPrincipal:
             widget.destroy()
             
         ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
-    
+        
+        # --- NUEVO: Limpiar descripción ---
+        self.text_descripcion.delete("1.0", tk.END)
+        self.descripcion_modelo = ""
+        # --- FIN NUEVO ---
+
+    def obtener_descripcion(self):
+        """Obtiene y limpia la descripción del modelo."""
+        texto = self.text_descripcion.get("1.0", tk.END).strip()
+        self.descripcion_modelo = texto
+        return texto
+
+    def cargar_descripcion(self, texto):
+        """
+        Carga una descripción previamente guardada en el área de texto.
+        (Usado cuando se cargue un modelo persistido en el futuro)
+        """
+        self.text_descripcion.delete("1.0", tk.END)
+        if texto:
+            self.text_descripcion.insert("1.0", texto)
+        self.descripcion_modelo = texto or ""
+
     # --- FIN NUEVO ---
 
     def obtener_features(self):
-        # ... (código sin cambios) ...
         seleccion = self.listbox_features.curselection()
         return [self.listbox_features.get(i) for i in seleccion]
 
     def obtener_target(self):
-        # ... (código sin cambios) ...
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
     def mostrar_mensaje(self, texto):
-        # ... (código sin cambios) ...
         self.text_mensajes.config(state="normal")
         self.text_mensajes.delete("1.0", tk.END) 
         self.text_mensajes.insert("1.0", texto)
-        # --- FIN MODIFICADO ---
         self.text_mensajes.config(state="disabled")
 
     # --- NUEVOS MÉTODOS PARA EL SCROLL ---
@@ -534,9 +576,9 @@ class AppPrincipal:
             self.canvas.itemconfig(self.scrollable_frame_window, width=event.width)
     # --- FIN NUEVOS MÉTODOS ---
 
+
 # === INICIO DE LA APLICACIÓN ===
 if __name__ == "__main__":
     root = tk.Tk()
     app = AppPrincipal(root)
     root.mainloop()
-    
