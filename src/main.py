@@ -298,23 +298,23 @@ class AppPrincipal:
             if not features:
                 raise ValueError("Selecciona al menos una columna de entrada (Features).")
             
-            # Reseteamos la división anterior
             self.X_train = None
             self.X_test = None
             self.y_train = None
             self.y_test = None
-            
-            # --- NUEVO ---
             self.resetar_resultados_modelo()
-            # --- FIN NUEVO ---
 
-            columnas = features + [target]
-            self.df_procesado = preprocesar_datos(
-                self.df, metodo, columnas, valor_constante
+            columnas_modelo = features + [target]
+            df_temp = self.df.copy()
+            df_procesado_parcial = preprocesar_datos(
+                df_temp, metodo, columnas_modelo, valor_constante
             )
+            self.df_procesado = df_procesado_parcial.copy()
+
             self.actualizar_tabla(self.df_procesado)
-            self.mostrar_mensaje("Preprocesado aplicado correctamente.")
+            self.mostrar_mensaje("Preprocesado aplicado correctamente (solo en columnas del modelo).")
             self.mostrar_mensaje(detectar_valores_faltantes(self.df_procesado))
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")

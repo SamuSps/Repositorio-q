@@ -60,22 +60,42 @@ def detectar_valores_faltantes(df):
     return resumen
 
 def preprocesar_datos(df, metodo, columnas=None, valor_constante=None):
-    """Elimina o rellena NaN."""
+    """
+    Aplica preprocesamiento SOLO a las columnas indicadas, pero mantiene TODAS las columnas.
+    """
     df = df.copy()
-    if columnas:
-        df = df[columnas + [df.columns[-1]]]  # Asegurar target
     
+    # Si no se especifican columnas, usar todas
+    if columnas is None:
+        columnas = df.select_dtypes(include=['number']).columns.tolist()
+    else:
+        # Asegurarnos de que solo trabajamos con columnas que existen
+        columnas = [col for col in columnas if col in df.columns]
+
+    if not columnas:
+        raise ValueError("No hay columnas válidas para preprocesar.")
+
     try:
         if metodo == "eliminar":
-            df = df.dropna()
+            df = df.dropna(subset=columnas)
+            
         elif metodo == "media":
-            df = df.fillna(df.mean(numeric_only=True))
+            medias = df[columnas].mean(numeric_only=True)
+            df[columnas] = df[columnas].fillna(medias)
+            
         elif metodo == "mediana":
-            df = df.fillna(df.median(numeric_only=True))
+            medianas = df[columnas].median(numeric_only=True)
+            df[columnas] = df[columnas].fillna(medianas)
+            
         elif metodo == "constante":
             if valor_constante is None:
-                raise ValueError("Falta valor constante.")
-            df = df.fillna(valor_constante)
+                raise ValueError("Debe proporcionar un valor constante.")
+            df[columnas] = df[columnas].fillna(valor_constante)
+            
+        else:
+            raise ValueError("Método no reconocido. Usa: eliminar, media, mediana, constante")
+
         return df
+
     except Exception as e:
-        raise ValueError(f"Error en preprocesado: {str(e)}")
+        raise ValueError(f"Error en preprocesamiento: {str(e)}")
