@@ -707,7 +707,7 @@ class AppPrincipal:
             return
             
         try:
-            fig = Figure(figsize=(6, 4), dpi=125)
+            fig = Figure(figsize=(6, 4), dpi=100)
             ax = fig.add_subplot(111)
 
             feature_name = features[0]
