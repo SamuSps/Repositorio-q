@@ -293,7 +293,7 @@ class AppPrincipal:
         paned.add(frame_right, weight=3)
 
         # Controles
-        self.btn_crear_modelo = ttk.Button(frame_left, text="Entrenar Modelo", command=lambda: self.ejecutar_con_carga(self.crear_modelo, "Entrenando modelo..."))
+        self.btn_crear_modelo = ttk.Button(frame_left, text="Crear Modelo", command=lambda: self.ejecutar_con_carga(self.crear_modelo, "Creando modelo..."))
         self.btn_crear_modelo.pack(pady=20, padx=10, fill="x")
         
         # Botón Guardar Modelo
