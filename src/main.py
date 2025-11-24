@@ -303,7 +303,7 @@ class AppPrincipal:
         # Descripción
         lbl_desc = ttk.Label(frame_left, text="Descripción (Opcional):")
         lbl_desc.pack(pady=(20, 5), padx=10, anchor="w")
-        self.text_descripcion = tk.Text(frame_left, height=10, width=20)
+        self.text_descripcion = tk.Text(frame_left, height=10, width=20, font=("Segoe UI", 10), bd=1, relief="solid")
         self.text_descripcion.pack(pady=5, padx=10, fill="both", expand=True)
 
         # Resultados (Gráfico y Métricas)
@@ -707,7 +707,7 @@ class AppPrincipal:
             return
             
         try:
-            fig = Figure(figsize=(6, 4), dpi=100)
+            fig = Figure(figsize=(5, 3), dpi=120)
             ax = fig.add_subplot(111)
 
             feature_name = features[0]
