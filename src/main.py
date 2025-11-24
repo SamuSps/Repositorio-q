@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog  # <-- AÑADIDO: filedialog
+from tkinter import ttk, messagebox, filedialog 
 from importacion_de_modulos import (
     seleccionar_archivo, importar_datos, 
     detectar_valores_faltantes, preprocesar_datos
@@ -26,13 +26,26 @@ except ImportError as e:
     exit()
 # --- FIN MODIFICADO ---
 
+import ctypes  # <--- AÑADIDO: Para acceder a funciones de sistema
+
+# --- AÑADIDO ---
+# Aumento de resolución de la UI
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+# --- FIN AÑADIDO ---
 
 class AppPrincipal:
     def __init__(self, root):
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
-        self.root.geometry("1200x900")
+        self.root.state("zoomed") #Inicia maximizado
         
+        # === Variables de Datos ===
         self.df = None
         self.df_procesado = None
 
@@ -42,45 +55,144 @@ class AppPrincipal:
         self.y_test = None
         
         self.model = None
+        self.descripcion_modelo = ""
+
+        # === Flags de Estado (Control del Wizard) ===
+        # Estas variables controlan si el usuario puede avanzar al siguiente paso
+        self.archivo_cargado = False
+        self.variables_seleccionadas = False
+        self.preprocesado_aplicado = False
+        self.division_realizada = False
+        self.modelo_creado = False
+
+        # === Variables UI y Navegación ===
+        self.paso_actual = 0
+        self.frames_pasos = []  # Lista para almacenar los frames de cada paso
+        self.status_var = tk.StringVar(value="Listo.")
+        
+        # === Variables de Control (Inputs) ===
+        self.metodo_var = tk.StringVar(value="eliminar")
+        self.test_split_var = tk.DoubleVar(value=20.0)
+        self.seed_var = tk.StringVar(value="42")
+
+        # Variables para gráficos
         self.canvas_widget = None
         self.toolbar_widget = None
-        self.canvas = None
-        self.scrollable_frame = None
-        self.scrollable_frame_window = None
-
-        self.descripcion_modelo = ""
 
         self.crear_interfaz()
 
+    def mostrar_mensaje(self, texto):
+        self.status_var.set(texto)
+        print(f"[INFO] {texto}")
+
+    # === Método Auxiliar: Ejecución con Ventana de Carga ===
+    # Bloquea la UI y muestra un spinner mientras se ejecuta una función pesada
+    def ejecutar_con_carga(self, funcion, mensaje, *args, **kwargs):
+        ventana_carga = tk.Toplevel(self.root)
+        ventana_carga.title("Procesando...")
+        ventana_carga.geometry("300x100")
+        ventana_carga.resizable(False, False)
+        
+        # Centrar ventana
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 150
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 50
+        ventana_carga.geometry(f"+{x}+{y}")
+        
+        ventana_carga.transient(self.root)
+        ventana_carga.grab_set()  # Bloquear interacción con la ventana principal
+        
+        ttk.Label(ventana_carga, text=mensaje, anchor="center").pack(pady=10)
+        pb = ttk.Progressbar(ventana_carga, mode="indeterminate")
+        pb.pack(fill="x", padx=20, pady=5)
+        pb.start(10)
+        
+        self.root.update_idletasks()
+        
+        try:
+            funcion(*args, **kwargs)
+        except Exception as e:
+            self.mostrar_mensaje(f"Error: {str(e)}")
+            messagebox.showerror("Error", str(e))
+        finally:
+            ventana_carga.destroy()
+
     def crear_interfaz(self):
+        # === Estructura Principal ===
         main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill="both", expand=True)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.canvas = tk.Canvas(main_frame)
-        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas)
+        # 1. Header (Título del paso actual)
+        self.header_label = ttk.Label(main_frame, text="Paso 0: Bienvenida", font=("Helvetica", 16, "bold"))
+        self.header_label.pack(pady=(0, 10))
 
-        self.scrollable_frame_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        # 2. Content Area (Donde se muestran los Frames de cada paso)
+        self.content_frame = ttk.Frame(main_frame)
+        self.content_frame.pack(fill="both", expand=True)
 
-        scrollbar.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
+        self.frames_pasos = []
+        # Inicialización de todos los pasos
+        self.crear_paso_bienvenida()
+        self.crear_paso_carga()
+        self.crear_paso_seleccion()
+        self.crear_paso_preprocesado()
+        self.crear_paso_division()
+        self.crear_paso_modelo()
 
-        self.scrollable_frame.bind("<Configure>", self.on_frame_configure)
-        self.canvas.bind("<Configure>", self.on_canvas_configure)
+        # 3. Footer (Botones de Navegación + Barra de Estado)
+        footer_frame = ttk.Frame(main_frame)
+        footer_frame.pack(fill="x", pady=10)
 
-        # === 1. Botón Abrir Archivo ===
-        self.btn_abrir = ttk.Button(self.scrollable_frame, text="Abrir Archivo", command=self.cargar_archivo)
-        self.btn_abrir.pack(pady=10, anchor="center")
+        self.btn_anterior = ttk.Button(footer_frame, text="< Anterior", command=lambda: self.navegar(-1), state="disabled")
+        self.btn_anterior.pack(side="left")
 
-        # === 2. Ruta del archivo ===
-        self.label_ruta = ttk.Label(self.scrollable_frame, text="Ruta: Ningún archivo seleccionado", foreground="gray")
-        self.label_ruta.pack(pady=5, fill="x", padx=20)
+        self.btn_siguiente = ttk.Button(footer_frame, text="Siguiente >", command=lambda: self.navegar(1))
+        self.btn_siguiente.pack(side="right")
 
-        # === 3. Tabla ===
-        frame_tabla = ttk.Frame(self.scrollable_frame)
-        frame_tabla.pack(pady=10, fill="both", expand=True, padx=20)
+        # Barra de Estado
+        status_frame = ttk.LabelFrame(main_frame, text="Estado")
+        status_frame.pack(fill="x", pady=(5, 0))
+        self.lbl_status = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
+        self.lbl_status.pack(fill="x", padx=5, pady=5)
 
+        # Iniciar en el primer paso
+        self.mostrar_paso(0)
+
+    # === PASO 0: Bienvenida ===
+    def crear_paso_bienvenida(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        lbl = ttk.Label(frame, text="Bienvenido al Asistente", font=("Helvetica", 14))
+        lbl.pack(pady=20)
+        
+        msg = (
+            "Este asistente le guiará paso a paso para crear un modelo de Regresión Lineal.\n\n"
+            "1. Carga de Datos: Importe su archivo CSV o Excel.\n"
+            "2. Selección de Variables: Elija qué predecir (Target) y con qué (Features).\n"
+            "3. Preprocesamiento: Gestione los valores faltantes.\n"
+            "4. División: Separe sus datos en entrenamiento y prueba.\n"
+            "5. Modelo: Entrene, evalúe y guarde su modelo.\n\n"
+            "Haga clic en 'Siguiente' para comenzar."
+        )
+        ttk.Label(frame, text=msg, justify="center").pack(pady=10)
+
+    # === PASO 1: Carga de Datos ===
+    def crear_paso_carga(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        # Botón Abrir Archivo
+        self.btn_abrir = ttk.Button(frame, text="Cargar Archivo de Datos", command=lambda: self.ejecutar_con_carga(self.cargar_archivo, "Cargando archivo..."))
+        self.btn_abrir.pack(pady=10)
+        
+        # Etiqueta Ruta
+        self.label_ruta = ttk.Label(frame, text="Ruta: Ningún archivo seleccionado", foreground="gray")
+        self.label_ruta.pack(pady=5)
+
+        # Tabla de Previsualización
+        frame_tabla = ttk.Frame(frame)
+        frame_tabla.pack(pady=10, fill="both", expand=True)
+        
         self.tabla = ttk.Treeview(frame_tabla, show="headings")
         scroll_y = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla.yview)
         scroll_x = ttk.Scrollbar(frame_tabla, orient="horizontal", command=self.tabla.xview)
@@ -89,108 +201,180 @@ class AppPrincipal:
         scroll_x.pack(side="bottom", fill="x")
         self.tabla.pack(fill="both", expand=True)
 
-        # === 4. Selección de columnas ===
-        frame_seleccion = ttk.Frame(self.scrollable_frame)
-        frame_seleccion.pack(pady=10, fill="x", padx=20)
+    # === PASO 2: Selección de Variables ===
+    def crear_paso_seleccion(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        frame_sel = ttk.Frame(frame)
+        frame_sel.pack(fill="both", expand=True, padx=20, pady=10)
 
-        frame_izq = ttk.LabelFrame(frame_seleccion, text="Columnas de Entrada (Features)")
-        frame_izq.pack(side="left", padx=10, fill="both", expand=True)
+        # Columnas de Entrada (Features)
+        frame_izq = ttk.LabelFrame(frame_sel, text="Variables Predictoras (Features)")
+        frame_izq.pack(side="left", fill="both", expand=True, padx=5)
         self.listbox_features = tk.Listbox(frame_izq, selectmode="multiple", exportselection=False)
         self.listbox_features.pack(fill="both", expand=True, padx=5, pady=5)
+        # Bind para actualizar estado del botón siguiente
+        self.listbox_features.bind("<<ListboxSelect>>", lambda e: self.actualizar_estado_navegacion())
 
-        frame_der = ttk.LabelFrame(frame_seleccion, text="Columna de Salida (Target)")
-        frame_der.pack(side="right", padx=10, fill="both", expand=True)
+        # Columna de Salida (Target)
+        frame_der = ttk.LabelFrame(frame_sel, text="Variable Objetivo (Target)")
+        frame_der.pack(side="right", fill="both", expand=True, padx=5)
         self.listbox_target = tk.Listbox(frame_der, exportselection=False)
         self.listbox_target.pack(fill="both", expand=True, padx=5, pady=5)
+        # Bind para actualizar estado del botón siguiente
+        self.listbox_target.bind("<<ListboxSelect>>", lambda e: self.actualizar_estado_navegacion())
 
-        # === 5. Preprocesamiento ===
-        frame_pre = ttk.LabelFrame(self.scrollable_frame, text="Preprocesamiento de Valores Faltantes")
-        frame_pre.pack(pady=10, fill="x", padx=20)
-        self.metodo_var = tk.StringVar(value="eliminar")
-        ttk.Radiobutton(frame_pre, text="Eliminar filas", variable=self.metodo_var, value="eliminar").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Radiobutton(frame_pre, text="Rellenar con Media", variable=self.metodo_var, value="media").grid(row=0, column=1, padx=5, pady=5)
-        ttk.Radiobutton(frame_pre, text="Rellenar con Mediana", variable=self.metodo_var, value="mediana").grid(row=0, column=2, padx=5, pady=5)
-        ttk.Radiobutton(frame_pre, text="Rellenar con Valor:", variable=self.metodo_var, value="constante").grid(row=1, column=0, padx=5, pady=5)
-        self.entry_constante = ttk.Entry(frame_pre, width=10)
-        self.entry_constante.grid(row=1, column=1, padx=5, pady=5)
-        self.btn_procesar = ttk.Button(frame_pre, text="Aplicar Preprocesado", command=self.aplicar_preprocesado)
-        self.btn_procesar.grid(row=1, column=3, padx=10, pady=5)
+    # === PASO 3: Preprocesamiento ===
+    def crear_paso_preprocesado(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        frame_opts = ttk.LabelFrame(frame, text="Opciones de Limpieza")
+        frame_opts.pack(pady=20, padx=20, fill="x")
+        
+        ttk.Radiobutton(frame_opts, text="Eliminar filas con nulos", variable=self.metodo_var, value="eliminar").pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(frame_opts, text="Rellenar con Media", variable=self.metodo_var, value="media").pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(frame_opts, text="Rellenar con Mediana", variable=self.metodo_var, value="mediana").pack(anchor="w", padx=10, pady=5)
+        
+        # Opción Constante
+        f_const = ttk.Frame(frame_opts)
+        f_const.pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(f_const, text="Rellenar con Valor:", variable=self.metodo_var, value="constante").pack(side="left")
+        self.entry_constante = ttk.Entry(f_const, width=10)
+        self.entry_constante.pack(side="left", padx=5)
 
-        # === 6. División de Datos ===
-        frame_division = ttk.LabelFrame(self.scrollable_frame, text="División de Datos (Train/Test)")
-        frame_division.pack(pady=10, fill="x", padx=20)
-        ttk.Label(frame_division, text="Porcentaje de Test:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.test_split_var = tk.DoubleVar(value=20.0) 
-        self.label_split_pct = ttk.Label(frame_division, text="20.0 %")
+        self.btn_procesar = ttk.Button(frame, text="Aplicar Preprocesamiento", command=lambda: self.ejecutar_con_carga(self.aplicar_preprocesado, "Procesando datos..."))
+        self.btn_procesar.pack(pady=20)
+
+    # === PASO 4: División de Datos ===
+    def crear_paso_division(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        frame_div = ttk.LabelFrame(frame, text="Configuración de Entrenamiento/Test")
+        frame_div.pack(pady=20, padx=20, fill="x")
+        
+        # Slider Porcentaje
+        f_slider = ttk.Frame(frame_div)
+        f_slider.pack(fill="x", padx=10, pady=10)
+        ttk.Label(f_slider, text="Tamaño Test (%):").pack(side="left")
+        
         def actualizar_label_split(valor):
             self.label_split_pct.config(text=f"{float(valor):.1f} %")
-        self.slider_split = ttk.Scale(frame_division, from_=5.0, to=50.0, orient="horizontal", variable=self.test_split_var, command=actualizar_label_split)
-        self.slider_split.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.label_split_pct.grid(row=0, column=2, padx=5, pady=5)
-        ttk.Label(frame_division, text="Semilla (Seed):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.seed_var = tk.StringVar(value="42")
-        self.entry_seed = ttk.Entry(frame_division, textvariable=self.seed_var, width=10)
-        self.entry_seed.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-        self.btn_dividir = ttk.Button(frame_division, text="Dividir Datos", command=self.aplicar_division)
-        self.btn_dividir.grid(row=1, column=3, padx=10, pady=5, sticky="e")
-        frame_division.columnconfigure(1, weight=1)
+            
+        self.slider_split = ttk.Scale(f_slider, from_=5.0, to=50.0, orient="horizontal", variable=self.test_split_var, command=actualizar_label_split)
+        self.slider_split.pack(side="left", fill="x", expand=True, padx=10)
+        self.label_split_pct = ttk.Label(f_slider, text="20.0 %")
+        self.label_split_pct.pack(side="left")
 
-        # === 7. Modelo ===
-        frame_modelo_main = ttk.LabelFrame(self.scrollable_frame, text="Creación y Evaluación del Modelo")
-        frame_modelo_main.pack(pady=10, fill="both", expand=True, padx=20)
-        frame_modelo_main.rowconfigure(0, weight=1)
-        frame_modelo_main.columnconfigure(1, weight=1)
+        # Semilla
+        f_seed = ttk.Frame(frame_div)
+        f_seed.pack(fill="x", padx=10, pady=10)
+        ttk.Label(f_seed, text="Semilla Aleatoria:").pack(side="left")
+        self.entry_seed = ttk.Entry(f_seed, textvariable=self.seed_var, width=10)
+        self.entry_seed.pack(side="left", padx=10)
+
+        self.btn_dividir = ttk.Button(frame, text="Dividir Datos", command=lambda: self.ejecutar_con_carga(self.aplicar_division, "Dividiendo datos..."))
+        self.btn_dividir.pack(pady=20)
+
+    # === PASO 5: Creación y Evaluación del Modelo ===
+    def crear_paso_modelo(self):
+        frame = ttk.Frame(self.content_frame)
+        self.frames_pasos.append(frame)
+        
+        # División: Controles (Izq) vs Resultados (Der)
+        paned = ttk.PanedWindow(frame, orient="horizontal")
+        paned.pack(fill="both", expand=True)
+        
+        frame_left = ttk.Frame(paned)
+        frame_right = ttk.Frame(paned)
+        paned.add(frame_left, weight=1)
+        paned.add(frame_right, weight=3)
 
         # Controles
-        frame_controles_modelo = ttk.Frame(frame_modelo_main)
-        frame_controles_modelo.grid(row=0, column=0, padx=10, pady=10, sticky="ns")
+        self.btn_crear_modelo = ttk.Button(frame_left, text="Entrenar Modelo", command=lambda: self.ejecutar_con_carga(self.crear_modelo, "Entrenando modelo..."))
+        self.btn_crear_modelo.pack(pady=20, padx=10, fill="x")
+        
+        # Botón Guardar Modelo
+        self.btn_guardar_modelo = ttk.Button(frame_left, text="Guardar Modelo", command=self.guardar_modelo, state="disabled")
+        self.btn_guardar_modelo.pack(pady=10, padx=10, fill="x")
 
-        self.btn_crear_modelo = ttk.Button(frame_controles_modelo, text="Crear Modelo", command=self.crear_modelo)
-        self.btn_crear_modelo.pack(pady=10)
+        # Descripción
+        lbl_desc = ttk.Label(frame_left, text="Descripción (Opcional):")
+        lbl_desc.pack(pady=(20, 5), padx=10, anchor="w")
+        self.text_descripcion = tk.Text(frame_left, height=10, width=20, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.text_descripcion.pack(pady=5, padx=10, fill="both", expand=True)
 
-        # --- NUEVO: Botón Guardar Modelo ---
-        self.btn_guardar_modelo = ttk.Button(
-            frame_controles_modelo,
-            text="Guardar Modelo",
-            command=self.guardar_modelo,
-            state="disabled"
-        )
-        self.btn_guardar_modelo.pack(pady=8)
-        # --- FIN NUEVO ---
+        # Resultados (Gráfico y Métricas)
+        self.frame_plot = ttk.Frame(frame_right, relief="sunken")
+        self.frame_plot.pack(fill="both", expand=True, padx=10, pady=10)
+        ttk.Label(self.frame_plot, text="El gráfico aparecerá aquí").pack(expand=True)
+        
+        self.label_formula = ttk.Label(frame_right, text="Fórmula: -", wraplength=500)
+        self.label_formula.pack(fill="x", padx=10)
+        
+        self.label_metrics = ttk.Label(frame_right, text="Métricas: -")
+        self.label_metrics.pack(fill="x", padx=10, pady=10)
 
-        # Área de descripción
-        frame_desc = ttk.LabelFrame(frame_controles_modelo, text="Descripción del Modelo (Opcional)")
-        frame_desc.pack(pady=10, fill="both", expand=True)
-        self.text_descripcion = tk.Text(frame_desc, height=6, wrap="word", font=("TkDefaultFont", 9))
-        self.text_descripcion.pack(fill="both", expand=True, padx=5, pady=5)
-        scroll_desc = ttk.Scrollbar(frame_desc, command=self.text_descripcion.yview)
-        scroll_desc.pack(side="right", fill="y")
-        self.text_descripcion.config(yscrollcommand=scroll_desc.set)
-        ttk.Label(frame_desc, text="Describe el propósito o características del modelo, etc.", 
-                 foreground="gray", font=("TkDefaultFont", 8, "italic")).pack(anchor="w", padx=5, pady=(0,5))
+    # === (Mostrar/Ocultar Frames) ===
+    def mostrar_paso(self, indice):
+        # Ocultar todos
+        for f in self.frames_pasos:
+            f.pack_forget()
+        
+        # Mostrar el actual
+        if 0 <= indice < len(self.frames_pasos):
+            self.frames_pasos[indice].pack(fill="both", expand=True)
+            self.paso_actual = indice
+            
+            titulos = [
+                "Paso 0: Bienvenida",
+                "Paso 1: Carga de Datos",
+                "Paso 2: Selección de Variables",
+                "Paso 3: Preprocesamiento",
+                "Paso 4: División de Datos",
+                "Paso 5: Creación del Modelo"
+            ]
+            self.header_label.config(text=titulos[indice])
+            self.actualizar_estado_navegacion()
 
-        # Resultados
-        frame_resultados = ttk.Frame(frame_modelo_main)
-        frame_resultados.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
-        frame_resultados.rowconfigure(0, weight=1)
-        frame_resultados.columnconfigure(0, weight=1)
+    def navegar(self, delta):
+        nuevo_paso = self.paso_actual + delta
+        if 0 <= nuevo_paso < len(self.frames_pasos):
+            self.mostrar_paso(nuevo_paso)
 
-        self.frame_plot = ttk.Frame(frame_resultados, relief="sunken", borderwidth=1)
-        self.frame_plot.grid(row=0, column=0, sticky="nsew")
-        ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
+    # === Navegación ===
+    def actualizar_estado_navegacion(self):
+        # Botón Anterior
+        if self.paso_actual == 0:
+            self.btn_anterior.config(state="disabled")
+        else:
+            self.btn_anterior.config(state="normal")
 
-        frame_texto_resultados = ttk.Frame(frame_resultados)
-        frame_texto_resultados.grid(row=1, column=0, sticky="ew", pady=10)
-        self.label_formula = ttk.Label(frame_texto_resultados, text="Fórmula: N/A", font=("TkDefaultFont", 10, "bold"), wraplength=700, justify="left")
-        self.label_formula.pack(anchor="w")
-        self.label_metrics = ttk.Label(frame_texto_resultados, text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A", justify="left")
-        self.label_metrics.pack(anchor="w", pady=5)
+        # "Siguiente"
+        puede_avanzar = False
+        
+        if self.paso_actual == 0:  # Bienvenida
+            puede_avanzar = True
+        elif self.paso_actual == 1:  # Carga
+            puede_avanzar = self.archivo_cargado
+        elif self.paso_actual == 2:  # Selección
+            feats = self.listbox_features.curselection()
+            target = self.listbox_target.curselection()
+            puede_avanzar = bool(feats and target)
+        elif self.paso_actual == 3:  # Preprocesado
+            puede_avanzar = self.preprocesado_aplicado
+        elif self.paso_actual == 4:  # División
+            puede_avanzar = self.division_realizada
+        elif self.paso_actual == 5:  # Modelo
+            self.btn_siguiente.config(text="Finalizar", state="disabled")
+            return
 
-        # Mensajes
-        self.text_mensajes = tk.Text(self.scrollable_frame, height=4, state="disabled", background="#f0f0f0")
-        self.text_mensajes.pack(pady=10, fill="x", padx=20)
+        state = "normal" if puede_avanzar else "disabled"
+        self.btn_siguiente.config(state=state, text="Siguiente >")
 
-    # === NUEVO: Guardar Modelo ===
+    # === Guardar Modelo ===
     def guardar_modelo(self):
         if self.model is None:
             messagebox.showwarning("Sin modelo", "Primero debe crear un modelo antes de guardarlo.")
@@ -255,7 +439,6 @@ class AppPrincipal:
             self.mostrar_mensaje(error_msg)
             messagebox.showerror("Error", error_msg)
 
-    # === MODIFICADO: Activar botón al crear modelo ===
     def crear_modelo(self):
         if self.X_train is None or self.y_train is None:
             messagebox.showwarning("Advertencia", "Primero debe dividir los datos en conjuntos de entrenamiento y test.")
@@ -276,35 +459,32 @@ class AppPrincipal:
 
             # Activar botón de guardar
             self.btn_guardar_modelo.config(state="normal")
+            
+            # Actualizar flag y navegación
+            self.modelo_creado = True
+            self.actualizar_estado_navegacion()
 
         except Exception as e:
             messagebox.showerror("Error al crear modelo", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
 
-    # === MODIFICADO: resetar también desactiva botón ===
+    # === Resetear Variables y UI ===
     def resetar_resultados_modelo(self):
         self.model = None
-        self.btn_guardar_modelo.config(state="disabled")  # Desactiva
+        self.btn_guardar_modelo.config(state="disabled")
 
         self.label_formula.config(text="Fórmula: N/A")
-        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
+        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
         
-        if self.canvas_widget:
-            self.canvas_widget.destroy()
-            self.canvas_widget = None
-        if self.toolbar_widget:
-            self.toolbar_widget.destroy()
-            self.toolbar_widget = None
-            
+        # Limpiar gráfico
         for widget in self.frame_plot.winfo_children():
             widget.destroy()
-            
         ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
         
         self.text_descripcion.delete("1.0", tk.END)
         self.descripcion_modelo = ""
 
-    # === Resto de métodos sin cambios (cargar_archivo, etc.) ===
+    # === Funcionalidad: Cargar Archivo ===
     def cargar_archivo(self):
         ruta = seleccionar_archivo()
         if not ruta:
@@ -321,13 +501,16 @@ class AppPrincipal:
 
             self.actualizar_tabla(self.df)
             self.actualizar_listboxes()
+            
+            # Actualizar flag y navegación
+            self.archivo_cargado = True
+            self.actualizar_estado_navegacion()
+            
             self.mostrar_mensaje(f"Datos cargados: {self.df.shape[0]} filas, {self.df.shape[1]} columnas.")
             self.mostrar_mensaje(detectar_valores_faltantes(self.df))
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
-
-    # ... (todos los demás métodos quedan exactamente igual: actualizar_tabla, aplicar_preprocesado, etc.)
 
     def obtener_descripcion(self):
         texto = self.text_descripcion.get("1.0", tk.END).strip()
@@ -348,12 +531,6 @@ class AppPrincipal:
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
-    def mostrar_mensaje(self, texto):
-        self.text_mensajes.config(state="normal")
-        self.text_mensajes.delete("1.0", tk.END)
-        self.text_mensajes.insert("1.0", texto)
-        self.text_mensajes.config(state="disabled")
-
     def on_frame_configure(self, event=None):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
@@ -361,7 +538,6 @@ class AppPrincipal:
         if self.scrollable_frame_window:
             self.canvas.itemconfig(self.scrollable_frame_window, width=event.width)
 
-    # === Métodos faltantes (copiados tal cual) ===
     def actualizar_tabla(self, df):
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
@@ -381,6 +557,7 @@ class AppPrincipal:
             self.listbox_features.insert(tk.END, col)
             self.listbox_target.insert(tk.END, col)
 
+    # === Funcionalidad: Preprocesamiento ===
     def aplicar_preprocesado(self):
         if self.df is None:
             messagebox.showwarning("Advertencia", "Primero carga un archivo.")
@@ -409,6 +586,11 @@ class AppPrincipal:
             self.df_procesado = df_procesado_parcial.copy()
 
             self.actualizar_tabla(self.df_procesado)
+            
+            # Actualizar flag y navegación
+            self.preprocesado_aplicado = True
+            self.actualizar_estado_navegacion()
+            
             self.mostrar_mensaje("Preprocesado aplicado correctamente (solo en columnas del modelo).")
             self.mostrar_mensaje(detectar_valores_faltantes(self.df_procesado))
 
@@ -416,6 +598,7 @@ class AppPrincipal:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
 
+    # === Funcionalidad: División de Datos ===
     def aplicar_division(self):
         if self.df_procesado is None:
             messagebox.showwarning("Advertencia", "Primero debe aplicar el preprocesamiento de datos.")
@@ -448,6 +631,11 @@ class AppPrincipal:
             msg_total = f"Datos divididos correctamente (Semilla={seed})."
             msg_train = f"Conjunto de Entrenamiento: {len(self.X_train)} filas."
             msg_test = f"Conjunto de Test: {len(self.X_test)} filas."
+            
+            # Actualizar flag y navegación
+            self.division_realizada = True
+            self.actualizar_estado_navegacion()
+            
             self.mostrar_mensaje(f"{msg_total}\n{msg_train}\n{msg_test}")
 
         except Exception as e:
@@ -487,8 +675,8 @@ class AppPrincipal:
             test_mse = mean_squared_error(self.y_test, y_test_pred)
 
             metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
-            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
-            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
+            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
+            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
             
             self.label_metrics.config(text=metrics_str)
             
@@ -497,9 +685,16 @@ class AppPrincipal:
 
     def actualizar_grafico(self):
         if self.canvas_widget:
-            self.canvas_widget.destroy()
-        if self.toolbar_widget:
-            self.toolbar_widget.destroy()
+            try:
+                self.canvas_widget.destroy()
+            except: pass
+            self.canvas_widget = None
+        if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+            try:
+                self.toolbar_widget.destroy()
+            except: pass
+            self.toolbar_widget = None
+            
         for widget in self.frame_plot.winfo_children():
             widget.destroy()
 
@@ -512,7 +707,7 @@ class AppPrincipal:
             return
             
         try:
-            fig = Figure(figsize=(6, 4), dpi=100)
+            fig = Figure(figsize=(5, 3), dpi=120)
             ax = fig.add_subplot(111)
 
             feature_name = features[0]
@@ -545,7 +740,6 @@ class AppPrincipal:
         except Exception as e:
             ttk.Label(self.frame_plot, text=f"Error al generar gráfico: {e}").pack(padx=10, pady=10)
             self.mostrar_mensaje(f"Error al graficar: {e}")
-
 
 # === INICIO DE LA APLICACIÓN ===
 if __name__ == "__main__":
