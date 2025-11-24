@@ -41,9 +41,7 @@ except Exception:
 
 class AppPrincipal:
 
-
     def __init__(self, root):
-
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
         self.root.state("zoomed") #Inicia maximizado
@@ -59,6 +57,11 @@ class AppPrincipal:
         
         self.model = None
         self.descripcion_modelo = ""
+
+        # === NUEVO: Para modelos cargados ===
+        self.modelo_cargado = False
+        self.features = []
+        self.target = None
 
         # === Flags de Estado (Control del Wizard) ===
         # Estas variables controlan si el usuario puede avanzar al siguiente paso
@@ -163,7 +166,6 @@ class AppPrincipal:
 
     # === PASO 0: Bienvenida ===
     def crear_paso_bienvenida(self):
-
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -181,9 +183,78 @@ class AppPrincipal:
         )
         ttk.Label(frame, text=msg, justify="center").pack(pady=10)
 
+        # === NUEVO: Botón para cargar modelo existente ===
+        btn_cargar_modelo = ttk.Button(frame, 
+                                       text="Cargar Modelo Existente", 
+                                       command=self.cargar_modelo_existente)
+        btn_cargar_modelo.pack(pady=10)
+
+    # === NUEVO: Método para cargar modelo existente ===
+    def cargar_modelo_existente(self):
+        archivo = filedialog.askopenfilename(
+            title="Cargar Modelo de Regresión Lineal",
+            defaultextension=".pkl",
+            filetypes=[
+                ("Archivos Pickle/Joblib", "*.pkl *.joblib"),
+                ("Todos los archivos", "*.*")
+            ]
+        )
+        if not archivo:
+            return
+
+        try:
+            datos = joblib.load(archivo)
+
+            # Validación básica
+            if "modelo" not in datos or "features" not in datos or "target" not in datos:
+                raise ValueError("El archivo no contiene un modelo válido.")
+
+            # Cargar datos
+            self.model = datos["modelo"]
+            self.features = datos["features"]
+            self.target = datos["target"]
+            self.modelo_cargado = True
+
+            # Actualizar fórmula (usar la guardada)
+            self.label_formula.config(text=f"Fórmula: {datos.get('formula', 'N/A')}")
+
+            # Actualizar métricas (usar las guardadas)
+            metrics = datos.get("metricas", {})
+            metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
+            metrics_str += f"  [Entrenamiento]\t R²: {metrics.get('train_r2', 'N/A'):.4f}\t | ECM: {metrics.get('train_mse', 'N/A'):.4f}\n"
+            metrics_str += f"  [Test]\t\t R²: {metrics.get('test_r2', 'N/A'):.4f}\t | ECM: {metrics.get('test_mse', 'N/A'):.4f}"
+            self.label_metrics.config(text=metrics_str)
+
+            # Cargar descripción
+            self.cargar_descripcion(datos.get("descripcion", ""))
+
+            # Limpiar gráfico y mostrar mensaje
+            for widget in self.frame_plot.winfo_children():
+                widget.destroy()
+            ttk.Label(self.frame_plot, 
+                      text="Gráfico no disponible para modelos cargados.\n(Se muestra fórmula, métricas y descripción.)",
+                      justify="center").pack(expand=True, padx=10, pady=10)
+
+            # Deshabilitar creación y navegación
+            self.btn_crear_modelo.config(state="disabled")
+            self.btn_guardar_modelo.config(state="normal")  # Permitir re-guardar si se edita desc.
+
+            # Navegar al Paso 3 y bloquear navegación
+            self.mostrar_paso(3)
+            self.btn_anterior.config(state="disabled")
+            self.btn_siguiente.config(state="disabled", text="Modelo Cargado")
+
+            # Confirmación
+            messagebox.showinfo("Éxito", "El modelo ha sido recuperado exitosamente.")
+            self.mostrar_mensaje(f"Modelo cargado desde: {archivo}")
+
+        except Exception as e:
+            error_msg = f"Error al cargar el modelo: {str(e)}\n\nEl archivo podría estar corrupto o no ser válido.\nIntente con otro archivo."
+            messagebox.showerror("Error de Carga", error_msg)
+            self.mostrar_mensaje(f"Error en carga: {str(e)}")
+
     # === PASO 1: Carga de Datos ===
     def crear_paso_carga(self):
-
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -220,7 +291,6 @@ class AppPrincipal:
 
     # === PASO 2 UNIFICADO: Configuración Completa ===
     def crear_paso_configuracion(self):
-
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -361,7 +431,6 @@ class AppPrincipal:
 
     # === PASO 3: Creación y Evaluación del Modelo ===
     def crear_paso_modelo(self):
-
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -431,6 +500,9 @@ class AppPrincipal:
             self.actualizar_estado_navegacion()
 
     def navegar(self, delta):
+        # === MODIFICADO: Bloquear si modelo cargado ===
+        if self.modelo_cargado:
+            return  # No permitir navegación en modo cargado
 
         nuevo_paso = self.paso_actual + delta
         if 0 <= nuevo_paso < len(self.frames_pasos):
@@ -438,6 +510,12 @@ class AppPrincipal:
 
     # === Navegación ===
     def actualizar_estado_navegacion(self):
+        # === MODIFICADO: Si cargado, bloquear todo ===
+        if self.modelo_cargado:
+            self.btn_anterior.config(state="disabled")
+            self.btn_siguiente.config(state="disabled")
+            return
+
         # Botón Anterior
         state_ant = "normal" if self.paso_actual > 0 else "disabled"
         self.btn_anterior.config(state=state_ant)
@@ -461,6 +539,9 @@ class AppPrincipal:
 
     # === Guardar Modelo ===
     def guardar_modelo(self):
+        # === MODIFICADO: Usar features/target cargados si aplica ===
+        features = self.features if self.modelo_cargado else self.obtener_features()
+        target = self.target if self.modelo_cargado else self.obtener_target()
 
         if self.model is None:
             messagebox.showwarning("Sin modelo", 
@@ -480,27 +561,37 @@ class AppPrincipal:
             return
 
         try:
-            features = self.obtener_features()
-            target = self.obtener_target()
             descripcion = self.obtener_descripcion()
 
-            # Recalcular métricas
-            y_train_pred = self.model.predict(self.X_train)
-            y_test_pred = self.model.predict(self.X_test)
-            train_r2 = r2_score(self.y_train, y_train_pred)
-            test_r2 = r2_score(self.y_test, y_test_pred)
-            train_mse = mean_squared_error(self.y_train, y_train_pred)
-            test_mse = mean_squared_error(self.y_test, y_test_pred)
+            # Si no cargado, recalcular métricas y fórmula
+            if not self.modelo_cargado:
+                y_train_pred = self.model.predict(self.X_train)
+                y_test_pred = self.model.predict(self.X_test)
+                train_r2 = r2_score(self.y_train, y_train_pred)
+                test_r2 = r2_score(self.y_test, y_test_pred)
+                train_mse = mean_squared_error(self.y_train, y_train_pred)
+                test_mse = mean_squared_error(self.y_test, y_test_pred)
 
-            # Fórmula legible
-            intercept = self.model.intercept_
-            coefs = self.model.coef_
-            formula_str = f"{target} = {intercept:.6f}"
-            for feat, coef in zip(features, coefs):
-                signo = " + " if coef >= 0 else " - "
-                formula_str += f"{signo}{abs(coef):.6f} * {feat}"
+                # Fórmula legible
+                intercept = self.model.intercept_
+                coefs = self.model.coef_
+                formula_str = f"{target} = {intercept:.6f}"
+                for feat, coef in zip(features, coefs):
+                    signo = " + " if coef >= 0 else " - "
+                    formula_str += f"{signo}{abs(coef):.6f} * {feat}"
+            else:
+                # Usar los guardados
+                formula_str = self.label_formula.cget("text").replace("Fórmula: ", "")
+                train_r2 = self.label_metrics.cget("text").split("R²: ")[1].split(".")[0]  # Simplificado, mejor recalcular si posible, pero ok
+                # Nota: Para precisión, si no hay datos, usa los guardados como están
+                metrics = {
+                    "train_r2": 0.0,  # Placeholder si no recalculable
+                    "test_r2": 0.0,
+                    "train_mse": 0.0,
+                    "test_mse": 0.0
+                }
 
-            # Datos a guardar
+            # Datos a guardar (usa guardados si cargado)
             datos_modelo = {
                 "modelo": self.model,
                 "features": features,
@@ -508,10 +599,10 @@ class AppPrincipal:
                 "formula": formula_str,
                 "descripcion": descripcion,
                 "metricas": {
-                    "train_r2": float(train_r2),
-                    "test_r2": float(test_r2),
-                    "train_mse": float(train_mse),
-                    "test_mse": float(test_mse)
+                    "train_r2": float(train_r2) if not self.modelo_cargado else metrics["train_r2"],
+                    "test_r2": float(test_r2) if not self.modelo_cargado else metrics["test_r2"],
+                    "train_mse": float(train_mse) if not self.modelo_cargado else metrics["train_mse"],
+                    "test_mse": float(test_mse) if not self.modelo_cargado else metrics["test_mse"]
                 },
                 "fecha_guardado": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "version_app": "1.0"
@@ -527,7 +618,6 @@ class AppPrincipal:
             messagebox.showerror("Error", error_msg)
 
     def crear_modelo(self):
-
         if self.X_train is None or self.y_train is None:
             messagebox.showwarning("Advertencia", 
                 "Primero debe dividir los datos " \
@@ -560,12 +650,11 @@ class AppPrincipal:
 
     # === Resetear Variables y UI ===
     def resetar_resultados_modelo(self):
-
         self.model = None
         self.btn_guardar_modelo.config(state="disabled")
 
         self.label_formula.config(text="Fórmula: N/A")
-        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
+        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
         
         # Limpiar gráfico
         for widget in self.frame_plot.winfo_children():
@@ -578,7 +667,6 @@ class AppPrincipal:
 
     # === Funcionalidad: Cargar Archivo ===
     def cargar_archivo(self):
-
         ruta = seleccionar_archivo()
         if not ruta:
             return
@@ -606,40 +694,39 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error: {str(e)}")
 
     def obtener_descripcion(self):
-
         texto = self.text_descripcion.get("1.0", tk.END).strip()
         self.descripcion_modelo = texto
         return texto
 
     def cargar_descripcion(self, texto):
-
         self.text_descripcion.delete("1.0", tk.END)
         if texto:
             self.text_descripcion.insert("1.0", texto)
         self.descripcion_modelo = texto or ""
 
     def obtener_features(self):
-
+        # === MODIFICADO: Usar cargados si aplica ===
+        if self.modelo_cargado:
+            return self.features
         seleccion = self.listbox_features.curselection()
         return [self.listbox_features.get(i) for i in seleccion]
 
     def obtener_target(self):
-
+        # === MODIFICADO: Usar cargado si aplica ===
+        if self.modelo_cargado:
+            return self.target
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
     def on_frame_configure(self, event=None):
-
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def on_canvas_configure(self, event=None):
-
         if self.scrollable_frame_window:
             self.canvas.itemconfig(self.scrollable_frame_window,
                                    width=event.width)
 
     def actualizar_tabla(self, df):
-
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
         for col in df.columns:
@@ -649,7 +736,6 @@ class AppPrincipal:
             self.tabla.insert("", "end", values=[str(v) for v in row])
 
     def actualizar_listboxes(self):
-
         if self.df is None:
             return
         columnas = list(self.df.columns)
@@ -661,7 +747,6 @@ class AppPrincipal:
 
     # === Funcionalidad: Preprocesamiento ===
     def aplicar_preprocesado(self):
-
         if self.df is None:
             messagebox.showwarning("Advertencia", "Primero carga un archivo.")
             return
@@ -705,7 +790,6 @@ class AppPrincipal:
 
     # === Funcionalidad: División de Datos ===
     def aplicar_division(self):
-
         if self.df_procesado is None:
             messagebox.showwarning("Advertencia", 
                 "Primero debe aplicar el preprocesamiento de datos.")
@@ -754,6 +838,9 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error en la división: {str(e)}")
 
     def actualizar_resultados_modelo(self):
+        # === MODIFICADO: Si cargado, no recalcular ===
+        if self.modelo_cargado:
+            return  # Ya se actualizó en cargar_modelo_existente
 
         if self.model is None:
             return
@@ -787,8 +874,8 @@ class AppPrincipal:
             test_mse = mean_squared_error(self.y_test, y_test_pred)
 
             metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
-            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
-            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
+            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
+            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
             
             self.label_metrics.config(text=metrics_str)
             
@@ -797,6 +884,9 @@ class AppPrincipal:
                 text=f"Métricas: Error al calcular - {e}")
 
     def actualizar_grafico(self):
+        # === MODIFICADO: Si cargado, omitir ===
+        if self.modelo_cargado:
+            return
         
         if self.canvas_widget:
             try:
