@@ -40,7 +40,10 @@ except Exception:
 # --- FIN AÑADIDO ---
 
 class AppPrincipal:
+    
+    
     def __init__(self, root):
+        
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
         self.root.state("zoomed") #Inicia maximizado
@@ -58,7 +61,7 @@ class AppPrincipal:
         self.descripcion_modelo = ""
 
         # === Flags de Estado (Control del Wizard) ===
-        # Estas variables controlan si el usuario puede avanzar al siguiente paso
+        #Variables controlan si el usuario puede avanzar al siguiente paso
         self.archivo_cargado = False
         self.variables_seleccionadas = False
         self.preprocesado_aplicado = False
@@ -82,12 +85,14 @@ class AppPrincipal:
         self.crear_interfaz()
 
     def mostrar_mensaje(self, texto):
+        
         self.status_var.set(texto)
         print(f"[INFO] {texto}")
 
     # === Método Auxiliar: Ejecución con Ventana de Carga ===
-    # Bloquea la UI y muestra un spinner mientras se ejecuta una función pesada
+    # Bloquea la UI y muestra un spinner mientras se ejecuta una función
     def ejecutar_con_carga(self, funcion, mensaje, *args, **kwargs):
+       
         ventana_carga = tk.Toplevel(self.root)
         ventana_carga.title("Procesando...")
         ventana_carga.geometry("300x100")
@@ -99,7 +104,7 @@ class AppPrincipal:
         ventana_carga.geometry(f"+{x}+{y}")
         
         ventana_carga.transient(self.root)
-        ventana_carga.grab_set()  # Bloquear interacción con la ventana principal
+        ventana_carga.grab_set()  # Bloquear interacción con ventana principal
         
         ttk.Label(ventana_carga, text=mensaje, anchor="center").pack(pady=10)
         pb = ttk.Progressbar(ventana_carga, mode="indeterminate")
@@ -122,7 +127,8 @@ class AppPrincipal:
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # 1. Header (Título del paso actual)
-        self.header_label = ttk.Label(main_frame, text="Paso 0: Bienvenida", font=("Helvetica", 16, "bold"))
+        self.header_label = ttk.Label(main_frame, text="Paso 0: Bienvenida",
+                                       font=("Helvetica", 16, "bold"))
         self.header_label.pack(pady=(0, 10))
 
         # 2. Content Area (Donde se muestran los Frames de cada paso)
@@ -142,16 +148,21 @@ class AppPrincipal:
         footer_frame = ttk.Frame(main_frame)
         footer_frame.pack(fill="x", pady=10)
 
-        self.btn_anterior = ttk.Button(footer_frame, text="< Anterior", command=lambda: self.navegar(-1), state="disabled")
+        self.btn_anterior = ttk.Button(footer_frame, text="< Anterior",
+                                        command=lambda: self.navegar(-1),
+                                          state="disabled")
         self.btn_anterior.pack(side="left")
 
-        self.btn_siguiente = ttk.Button(footer_frame, text="Siguiente >", command=lambda: self.navegar(1))
+        self.btn_siguiente = ttk.Button(footer_frame, text="Siguiente >", 
+                                        command=lambda: self.navegar(1))
         self.btn_siguiente.pack(side="right")
 
         # Barra de Estado
         status_frame = ttk.LabelFrame(main_frame, text="Estado")
         status_frame.pack(fill="x", pady=(5, 0))
-        self.lbl_status = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
+        self.lbl_status = ttk.Label(status_frame, 
+                                    textvariable=self.status_var, 
+                                    foreground="blue")
         self.lbl_status.pack(fill="x", padx=5, pady=5)
 
         # Iniciar en el primer paso
@@ -159,10 +170,12 @@ class AppPrincipal:
 
     # === PASO 0: Bienvenida ===
     def crear_paso_bienvenida(self):
+        
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
-        lbl = ttk.Label(frame, text="Bienvenido al Asistente", font=("Helvetica", 14))
+        lbl = ttk.Label(frame, text="Bienvenido al Asistente", 
+                        font=("Helvetica", 14))
         lbl.pack(pady=20)
         
         msg = (
@@ -178,15 +191,20 @@ class AppPrincipal:
 
     # === PASO 1: Carga de Datos ===
     def crear_paso_carga(self):
+        
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
         # Botón Abrir Archivo
-        self.btn_abrir = ttk.Button(frame, text="Cargar Archivo de Datos", command=lambda: self.ejecutar_con_carga(self.cargar_archivo, "Cargando archivo..."))
+        self.btn_abrir = ttk.Button(frame, 
+         text="Cargar Archivo de Datos", 
+         command=lambda: self.ejecutar_con_carga
+         (self.cargar_archivo, "Cargando archivo..."))
         self.btn_abrir.pack(pady=10)
         
         # Etiqueta Ruta
-        self.label_ruta = ttk.Label(frame, text="Ruta: Ningún archivo seleccionado", foreground="gray")
+        self.label_ruta = ttk.Label(frame, 
+        text="Ruta: Ningún archivo seleccionado", foreground="gray")
         self.label_ruta.pack(pady=5)
 
         # Tabla de Previsualización
@@ -194,15 +212,19 @@ class AppPrincipal:
         frame_tabla.pack(pady=10, fill="both", expand=True)
         
         self.tabla = ttk.Treeview(frame_tabla, show="headings")
-        scroll_y = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla.yview)
-        scroll_x = ttk.Scrollbar(frame_tabla, orient="horizontal", command=self.tabla.xview)
-        self.tabla.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
+        scroll_y = ttk.Scrollbar(frame_tabla, orient="vertical",
+                                  command=self.tabla.yview)
+        scroll_x = ttk.Scrollbar(frame_tabla, orient="horizontal",
+                                  command=self.tabla.xview)
+        self.tabla.configure(yscrollcommand=scroll_y.set,
+                              xscrollcommand=scroll_x.set)
         scroll_y.pack(side="right", fill="y")
         scroll_x.pack(side="bottom", fill="x")
         self.tabla.pack(fill="both", expand=True)
 
     # === PASO 2: Selección de Variables ===
     def crear_paso_seleccion(self):
+
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -210,41 +232,56 @@ class AppPrincipal:
         frame_sel.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Columnas de Entrada (Features)
-        frame_izq = ttk.LabelFrame(frame_sel, text="Variables Predictoras (Features)")
+        frame_izq = ttk.LabelFrame(frame_sel, 
+                                   text="Variables Predictoras (Features)")
         frame_izq.pack(side="left", fill="both", expand=True, padx=5)
-        self.listbox_features = tk.Listbox(frame_izq, selectmode="multiple", exportselection=False)
+        self.listbox_features = tk.Listbox(frame_izq, selectmode="multiple",
+                                            exportselection=False)
         self.listbox_features.pack(fill="both", expand=True, padx=5, pady=5)
         # Bind para actualizar estado del botón siguiente
-        self.listbox_features.bind("<<ListboxSelect>>", lambda e: self.actualizar_estado_navegacion())
+        self.listbox_features.bind("<<ListboxSelect>>", lambda e: 
+                                   self.actualizar_estado_navegacion())
 
         # Columna de Salida (Target)
-        frame_der = ttk.LabelFrame(frame_sel, text="Variable Objetivo (Target)")
+        frame_der = ttk.LabelFrame(frame_sel,
+                                    text="Variable Objetivo (Target)")
         frame_der.pack(side="right", fill="both", expand=True, padx=5)
         self.listbox_target = tk.Listbox(frame_der, exportselection=False)
         self.listbox_target.pack(fill="both", expand=True, padx=5, pady=5)
         # Bind para actualizar estado del botón siguiente
-        self.listbox_target.bind("<<ListboxSelect>>", lambda e: self.actualizar_estado_navegacion())
+        self.listbox_target.bind("<<ListboxSelect>>", lambda e:
+                                  self.actualizar_estado_navegacion())
 
     # === PASO 3: Preprocesamiento ===
     def crear_paso_preprocesado(self):
+
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
         frame_opts = ttk.LabelFrame(frame, text="Opciones de Limpieza")
         frame_opts.pack(pady=20, padx=20, fill="x")
         
-        ttk.Radiobutton(frame_opts, text="Eliminar filas con nulos", variable=self.metodo_var, value="eliminar").pack(anchor="w", padx=10, pady=5)
-        ttk.Radiobutton(frame_opts, text="Rellenar con Media", variable=self.metodo_var, value="media").pack(anchor="w", padx=10, pady=5)
-        ttk.Radiobutton(frame_opts, text="Rellenar con Mediana", variable=self.metodo_var, value="mediana").pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(frame_opts, text="Eliminar filas con nulos", 
+            variable=self.metodo_var,
+            value="eliminar").pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(frame_opts, text="Rellenar con Media",
+            variable=self.metodo_var, 
+            value="media").pack(anchor="w", padx=10, pady=5)
+        ttk.Radiobutton(frame_opts, text="Rellenar con Mediana", 
+            variable=self.metodo_var, 
+            value="mediana").pack(anchor="w", padx=10, pady=5)
         
         # Opción Constante
         f_const = ttk.Frame(frame_opts)
         f_const.pack(anchor="w", padx=10, pady=5)
-        ttk.Radiobutton(f_const, text="Rellenar con Valor:", variable=self.metodo_var, value="constante").pack(side="left")
+        ttk.Radiobutton(f_const, text="Rellenar con Valor:",
+            variable=self.metodo_var, value="constante").pack(side="left")
         self.entry_constante = ttk.Entry(f_const, width=10)
         self.entry_constante.pack(side="left", padx=5)
 
-        self.btn_procesar = ttk.Button(frame, text="Aplicar Preprocesamiento", command=lambda: self.ejecutar_con_carga(self.aplicar_preprocesado, "Procesando datos..."))
+        self.btn_procesar = ttk.Button(frame, text="Aplicar Preprocesamiento",
+            command=lambda: self.ejecutar_con_carga(self.aplicar_preprocesado,
+                                                 "Procesando datos..."))
         self.btn_procesar.pack(pady=20)
 
     # === PASO 4: División de Datos ===
@@ -252,7 +289,8 @@ class AppPrincipal:
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
-        frame_div = ttk.LabelFrame(frame, text="Configuración de Entrenamiento/Test")
+        frame_div = ttk.LabelFrame(frame,
+        text="Configuración de Entrenamiento/Test")
         frame_div.pack(pady=20, padx=20, fill="x")
         
         # Slider Porcentaje
@@ -261,9 +299,12 @@ class AppPrincipal:
         ttk.Label(f_slider, text="Tamaño Test (%):").pack(side="left")
         
         def actualizar_label_split(valor):
+
             self.label_split_pct.config(text=f"{float(valor):.1f} %")
             
-        self.slider_split = ttk.Scale(f_slider, from_=5.0, to=50.0, orient="horizontal", variable=self.test_split_var, command=actualizar_label_split)
+        self.slider_split = ttk.Scale(f_slider, from_=5.0, to=50.0,
+            orient="horizontal", variable=self.test_split_var,
+            command=actualizar_label_split)
         self.slider_split.pack(side="left", fill="x", expand=True, padx=10)
         self.label_split_pct = ttk.Label(f_slider, text="20.0 %")
         self.label_split_pct.pack(side="left")
@@ -272,14 +313,18 @@ class AppPrincipal:
         f_seed = ttk.Frame(frame_div)
         f_seed.pack(fill="x", padx=10, pady=10)
         ttk.Label(f_seed, text="Semilla Aleatoria:").pack(side="left")
-        self.entry_seed = ttk.Entry(f_seed, textvariable=self.seed_var, width=10)
+        self.entry_seed = ttk.Entry(f_seed, textvariable=self.seed_var,
+                                     width=10)
         self.entry_seed.pack(side="left", padx=10)
 
-        self.btn_dividir = ttk.Button(frame, text="Dividir Datos", command=lambda: self.ejecutar_con_carga(self.aplicar_division, "Dividiendo datos..."))
+        self.btn_dividir = ttk.Button(frame, text="Dividir Datos", 
+            command=lambda: self.ejecutar_con_carga(self.aplicar_division,
+                                                     "Dividiendo datos..."))
         self.btn_dividir.pack(pady=20)
 
     # === PASO 5: Creación y Evaluación del Modelo ===
     def crear_paso_modelo(self):
+
         frame = ttk.Frame(self.content_frame)
         self.frames_pasos.append(frame)
         
@@ -293,25 +338,32 @@ class AppPrincipal:
         paned.add(frame_right, weight=3)
 
         # Controles
-        self.btn_crear_modelo = ttk.Button(frame_left, text="Entrenar Modelo", command=lambda: self.ejecutar_con_carga(self.crear_modelo, "Entrenando modelo..."))
+        self.btn_crear_modelo = ttk.Button(frame_left,
+            text="Entrenar Modelo", command=lambda: 
+            self.ejecutar_con_carga(self.crear_modelo, "Entrenando modelo.."))
         self.btn_crear_modelo.pack(pady=20, padx=10, fill="x")
         
         # Botón Guardar Modelo
-        self.btn_guardar_modelo = ttk.Button(frame_left, text="Guardar Modelo", command=self.guardar_modelo, state="disabled")
+        self.btn_guardar_modelo = ttk.Button(frame_left,
+            text="Guardar Modelo", 
+            command=self.guardar_modelo, state="disabled")
         self.btn_guardar_modelo.pack(pady=10, padx=10, fill="x")
 
         # Descripción
         lbl_desc = ttk.Label(frame_left, text="Descripción (Opcional):")
         lbl_desc.pack(pady=(20, 5), padx=10, anchor="w")
-        self.text_descripcion = tk.Text(frame_left, height=10, width=20, font=("Segoe UI", 10), bd=1, relief="solid")
+        self.text_descripcion = tk.Text(frame_left, height=10, width=20, 
+            font=("Segoe UI", 10), bd=1, relief="solid")
         self.text_descripcion.pack(pady=5, padx=10, fill="both", expand=True)
 
         # Resultados (Gráfico y Métricas)
         self.frame_plot = ttk.Frame(frame_right, relief="sunken")
         self.frame_plot.pack(fill="both", expand=True, padx=10, pady=10)
-        ttk.Label(self.frame_plot, text="El gráfico aparecerá aquí").pack(expand=True)
+        ttk.Label(self.frame_plot,
+            text="El gráfico aparecerá aquí").pack(expand=True)
         
-        self.label_formula = ttk.Label(frame_right, text="Fórmula: -", wraplength=500)
+        self.label_formula = ttk.Label(frame_right, 
+                                       text="Fórmula: -", wraplength=500)
         self.label_formula.pack(fill="x", padx=10)
         
         self.label_metrics = ttk.Label(frame_right, text="Métricas: -")
@@ -340,6 +392,7 @@ class AppPrincipal:
             self.actualizar_estado_navegacion()
 
     def navegar(self, delta):
+
         nuevo_paso = self.paso_actual + delta
         if 0 <= nuevo_paso < len(self.frames_pasos):
             self.mostrar_paso(nuevo_paso)
@@ -376,8 +429,10 @@ class AppPrincipal:
 
     # === Guardar Modelo ===
     def guardar_modelo(self):
+
         if self.model is None:
-            messagebox.showwarning("Sin modelo", "Primero debe crear un modelo antes de guardarlo.")
+            messagebox.showwarning("Sin modelo",
+                "Primero debe crear un modelo antes de guardarlo.")
             return
 
         archivo = filedialog.asksaveasfilename(
@@ -440,8 +495,11 @@ class AppPrincipal:
             messagebox.showerror("Error", error_msg)
 
     def crear_modelo(self):
+
         if self.X_train is None or self.y_train is None:
-            messagebox.showwarning("Advertencia", "Primero debe dividir los datos en conjuntos de entrenamiento y test.")
+            messagebox.showwarning("Advertencia", 
+                "Primero debe dividir los datos" \
+                " en conjuntos de entrenamiento y test.")
             self.mostrar_mensaje("Error: Datos no divididos.")
             return
 
@@ -470,6 +528,7 @@ class AppPrincipal:
 
     # === Resetear Variables y UI ===
     def resetar_resultados_modelo(self):
+
         self.model = None
         self.btn_guardar_modelo.config(state="disabled")
 
@@ -479,13 +538,15 @@ class AppPrincipal:
         # Limpiar gráfico
         for widget in self.frame_plot.winfo_children():
             widget.destroy()
-        ttk.Label(self.frame_plot, text="El gráfico del modelo aparecerá aquí.").pack(padx=10, pady=10)
+        ttk.Label(self.frame_plot,
+            text="El gráfico aparecerá aquí.").pack(padx=10, pady=10)
         
         self.text_descripcion.delete("1.0", tk.END)
         self.descripcion_modelo = ""
 
     # === Funcionalidad: Cargar Archivo ===
     def cargar_archivo(self):
+
         ruta = seleccionar_archivo()
         if not ruta:
             return
@@ -513,32 +574,40 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error: {str(e)}")
 
     def obtener_descripcion(self):
+
         texto = self.text_descripcion.get("1.0", tk.END).strip()
         self.descripcion_modelo = texto
         return texto
 
     def cargar_descripcion(self, texto):
+
         self.text_descripcion.delete("1.0", tk.END)
         if texto:
             self.text_descripcion.insert("1.0", texto)
         self.descripcion_modelo = texto or ""
 
     def obtener_features(self):
+
         seleccion = self.listbox_features.curselection()
         return [self.listbox_features.get(i) for i in seleccion]
 
     def obtener_target(self):
+
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
     def on_frame_configure(self, event=None):
+
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def on_canvas_configure(self, event=None):
+
         if self.scrollable_frame_window:
-            self.canvas.itemconfig(self.scrollable_frame_window, width=event.width)
+            self.canvas.itemconfig(self.scrollable_frame_window,
+                                    width=event.width)
 
     def actualizar_tabla(self, df):
+
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
         for col in df.columns:
@@ -548,6 +617,7 @@ class AppPrincipal:
             self.tabla.insert("", "end", values=[str(v) for v in row])
 
     def actualizar_listboxes(self):
+
         if self.df is None:
             return
         columnas = list(self.df.columns)
@@ -559,6 +629,7 @@ class AppPrincipal:
 
     # === Funcionalidad: Preprocesamiento ===
     def aplicar_preprocesado(self):
+
         if self.df is None:
             messagebox.showwarning("Advertencia", "Primero carga un archivo.")
             return
@@ -573,7 +644,7 @@ class AppPrincipal:
             if not target:
                 raise ValueError("Selecciona una columna de salida (Target).")
             if not features:
-                raise ValueError("Selecciona al menos una columna de entrada (Features).")
+                raise ValueError("Selecciona al menos una columna de entrada.")
             
             self.X_train = self.X_test = self.y_train = self.y_test = None
             self.resetar_resultados_modelo()
@@ -591,8 +662,10 @@ class AppPrincipal:
             self.preprocesado_aplicado = True
             self.actualizar_estado_navegacion()
             
-            self.mostrar_mensaje("Preprocesado aplicado correctamente (solo en columnas del modelo).")
-            self.mostrar_mensaje(detectar_valores_faltantes(self.df_procesado))
+            self.mostrar_mensaje("Preprocesado aplicado correctamente"
+            " (solo en columnas del modelo).")
+            self.mostrar_mensaje(detectar_valores_faltantes
+                                 (self.df_procesado))
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
@@ -600,11 +673,14 @@ class AppPrincipal:
 
     # === Funcionalidad: División de Datos ===
     def aplicar_division(self):
+
         if self.df_procesado is None:
-            messagebox.showwarning("Advertencia", "Primero debe aplicar el preprocesamiento de datos.")
+            messagebox.showwarning("Advertencia",
+                "Primero debe aplicar el preprocesamiento de datos.")
             return
         if len(self.df_procesado) < 5:
-            messagebox.showerror("Error", "No hay suficientes datos para realizar la división (se requieren al menos 5 filas).")
+            messagebox.showerror("Error",
+                 "No hay suficientes datos para realizar la división (se requieren al menos 5 filas).")
             return
 
         try:
@@ -618,19 +694,21 @@ class AppPrincipal:
             features = self.obtener_features()
             target = self.obtener_target()
             if not target or not features:
-                messagebox.showerror("Error", "Asegúrese de tener features y target seleccionados.")
+                messagebox.showerror("Error",
+                    "Asegúrese de tener features y target seleccionados.")
                 return
 
             X = self.df_procesado[features]
             y = self.df_procesado[target]
 
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            self.X_train, self.X_test,
+            self.y_train, self.y_test = train_test_split(
                 X, y, test_size=test_size_float, random_state=seed
             )
 
             msg_total = f"Datos divididos correctamente (Semilla={seed})."
-            msg_train = f"Conjunto de Entrenamiento: {len(self.X_train)} filas."
-            msg_test = f"Conjunto de Test: {len(self.X_test)} filas."
+            msg_train = f"Conjunto Entrenamiento: {len(self.X_train)} filas."
+            msg_test = f"Conjunto Test: {len(self.X_test)} filas."
             
             # Actualizar flag y navegación
             self.division_realizada = True
@@ -643,6 +721,7 @@ class AppPrincipal:
             self.mostrar_mensaje(f"Error en la división: {str(e)}")
 
     def actualizar_resultados_modelo(self):
+        
         if self.model is None:
             return
 
@@ -702,7 +781,9 @@ class AppPrincipal:
         target = self.obtener_target()
 
         if len(features) > 1:
-            ttk.Label(self.frame_plot, text="No se puede graficar: Múltiples features (entradas).\nEl modelo fue creado, pero no es visualizable en 2D.").pack(padx=10, pady=10)
+            ttk.Label(self.frame_plot,
+                text="No se puede graficar: Múltiples features (entradas).\n" \
+                "El modelo fue creado, pero no es visualizable en 2D.").pack(padx=10, pady=10)
             self.mostrar_mensaje("Gráfico no generado (múltiples features).")
             return
             
@@ -711,15 +792,20 @@ class AppPrincipal:
             ax = fig.add_subplot(111)
 
             feature_name = features[0]
-            ax.scatter(self.X_train[feature_name], self.y_train, color='blue', label='Entrenamiento', alpha=0.7)
-            ax.scatter(self.X_test[feature_name], self.y_test, color='red', label='Test', alpha=0.7)
+            ax.scatter(self.X_train[feature_name], self.y_train,
+                        color='blue', label='Entrenamiento', alpha=0.7)
+            ax.scatter(self.X_test[feature_name], self.y_test, 
+                       color='red', label='Test', alpha=0.7)
 
-            X_all_series = pd.concat([self.X_train[feature_name], self.X_test[feature_name]])
-            X_line = np.linspace(X_all_series.min(), X_all_series.max(), 100).reshape(-1, 1)
+            X_all_series = pd.concat([self.X_train[feature_name],
+                                       self.X_test[feature_name]])
+            X_line = np.linspace(X_all_series.min(), 
+                                 X_all_series.max(), 100).reshape(-1, 1)
             X_line_df = pd.DataFrame(X_line, columns=[feature_name])
             y_line = self.model.predict(X_line_df)
             
-            ax.plot(X_line, y_line, color='green', linewidth=3, label='Recta de Regresión')
+            ax.plot(X_line, y_line, color='green', linewidth=3, 
+                label='Recta de Regresión')
             ax.set_xlabel(feature_name)
             ax.set_ylabel(target)
             ax.set_title("Regresión Lineal: Ajuste del Modelo")
@@ -738,7 +824,8 @@ class AppPrincipal:
             canvas.draw()
             
         except Exception as e:
-            ttk.Label(self.frame_plot, text=f"Error al generar gráfico: {e}").pack(padx=10, pady=10)
+            ttk.Label(self.frame_plot, 
+                text=f"Error al generar gráfico: {e}").pack(padx=10, pady=10)
             self.mostrar_mensaje(f"Error al graficar: {e}")
 
 # === INICIO DE LA APLICACIÓN ===
