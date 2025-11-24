@@ -344,7 +344,7 @@ class AppPrincipal:
             X = self.df_procesado[features]
             y = self.df_procesado[target]
             
-            self.X_train, self.X_test,
+            self.X_train, self.X_test, \
             self.y_train, self.y_test = train_test_split(
                 X, y, test_size=test_size, random_state=seed
             )
@@ -734,7 +734,7 @@ class AppPrincipal:
             X = self.df_procesado[features]
             y = self.df_procesado[target]
 
-            self.X_train, self.X_test, 
+            self.X_train, self.X_test, \
             self.y_train, self.y_test = train_test_split(
                 X, y, test_size=test_size_float, random_state=seed
             )
