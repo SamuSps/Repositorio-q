@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog  # <-- AÑADIDO: filedialog
+from tkinter import ttk, messagebox, filedialog 
 from importacion_de_modulos import (
     seleccionar_archivo, importar_datos, 
     detectar_valores_faltantes, preprocesar_datos
@@ -26,11 +26,24 @@ except ImportError as e:
     exit()
 # --- FIN MODIFICADO ---
 
+import ctypes  # <--- AÑADIDO: Para acceder a funciones de sistema
+
+# --- AÑADIDO ---
+# Aumento de resolución de la UI
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+# --- FIN AÑADIDO ---
+
 class AppPrincipal:
     def __init__(self, root):
         self.root = root
         self.root.title("Creador de Modelos - Regresión Lineal")
-        self.root.geometry("1200x900")
+        self.root.state("zoomed") #Inicia maximizado
         
         # === Variables de Datos ===
         self.df = None
@@ -694,7 +707,7 @@ class AppPrincipal:
             return
             
         try:
-            fig = Figure(figsize=(6, 4), dpi=100)
+            fig = Figure(figsize=(6, 4), dpi=125)
             ax = fig.add_subplot(111)
 
             feature_name = features[0]
