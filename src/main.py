@@ -62,6 +62,7 @@ class AppPrincipal:
         self.modelo_cargado = False
         self.features = []
         self.target = None
+        self.metricas = None  # Para métricas cargadas
 
         # === Flags de Estado (Control del Wizard) ===
         # Estas variables controlan si el usuario puede avanzar al siguiente paso
@@ -84,6 +85,12 @@ class AppPrincipal:
         # Variables para gráficos
         self.canvas_widget = None
         self.toolbar_widget = None
+
+        # === NUEVO: Para UI de Predicción ===
+        self.frame_prediccion = None
+        self.entries_prediccion = {}  # Diccionario: feature -> Entry
+        self.label_salida = None
+        self.btn_prediccion = None
 
         self.crear_interfaz()
 
@@ -134,8 +141,30 @@ class AppPrincipal:
                                         font=("Helvetica", 16, "bold"))
         self.header_label.pack(pady=(0, 10))
 
-        # 2. Content Area (Donde se muestran los Frames de cada paso)
-        self.content_frame = ttk.Frame(main_frame)
+        # === FIX: Canvas con Scrollbar para Content Area ===
+        # Frame contenedor para canvas y scrollbar
+        canvas_frame = ttk.Frame(main_frame)
+        canvas_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+        self.canvas = tk.Canvas(canvas_frame, bg="white")
+        self.scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            self.on_frame_configure
+        )
+
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        self.canvas.bind("<Configure>", self.on_canvas_configure)
+
+        # 2. Content Area (Ahora dentro del scrollable_frame)
+        self.content_frame = ttk.Frame(self.scrollable_frame)
         self.content_frame.pack(fill="both", expand=True)
 
         self.frames_pasos = []
@@ -163,6 +192,33 @@ class AppPrincipal:
 
         # Iniciar en el primer paso
         self.mostrar_paso(0)
+
+    # === FIX: Métodos para Scroll (Actualizados para evitar espacio vacío) ===
+    def on_frame_configure(self, event=None):
+        # Actualizar tamaños con update para asegurar cálculos precisos
+        self.canvas.update_idletasks()
+        self.scrollable_frame.update_idletasks()
+        
+        # Actualizar scrollregion
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        
+        # Ajustar tamaño de la ventana del canvas
+        canvas_width = self.canvas.winfo_width()
+        content_height = self.scrollable_frame.winfo_reqheight()
+        self.canvas.itemconfig(self.canvas_window, 
+                               width=canvas_width,
+                               height=content_height)
+        
+        # FIX PRINCIPAL: Si el contenido es más corto que el canvas, redimensionar el canvas para eliminar espacio vacío
+        canvas_height = self.canvas.winfo_height()
+        if content_height < canvas_height:
+            self.canvas.configure(height=content_height)
+
+    def on_canvas_configure(self, event=None):
+        # Ajustar ancho de la ventana del canvas al ancho del canvas
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
+        # Reconfigurar scroll y heights si es necesario
+        self.on_frame_configure()
 
     # === PASO 0: Bienvenida ===
     def crear_paso_bienvenida(self):
@@ -213,13 +269,14 @@ class AppPrincipal:
             self.model = datos["modelo"]
             self.features = datos["features"]
             self.target = datos["target"]
+            self.metricas = datos.get("metricas", {})  # Guardar métricas
             self.modelo_cargado = True
 
             # Actualizar fórmula (usar la guardada)
             self.label_formula.config(text=f"Fórmula: {datos.get('formula', 'N/A')}")
 
             # Actualizar métricas (usar las guardadas)
-            metrics = datos.get("metricas", {})
+            metrics = self.metricas
             metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
             metrics_str += f"  [Entrenamiento]\t R²: {metrics.get('train_r2', 'N/A'):.4f}\t | ECM: {metrics.get('train_mse', 'N/A'):.4f}\n"
             metrics_str += f"  [Test]\t\t R²: {metrics.get('test_r2', 'N/A'):.4f}\t | ECM: {metrics.get('test_mse', 'N/A'):.4f}"
@@ -239,6 +296,9 @@ class AppPrincipal:
             self.btn_crear_modelo.config(state="disabled")
             self.btn_guardar_modelo.config(state="normal")  # Permitir re-guardar si se edita desc.
 
+            # === NUEVO: Habilitar Predicción ===
+            self.crear_ui_prediccion()
+
             # Navegar al Paso 3 y bloquear navegación
             self.mostrar_paso(3)
             self.btn_anterior.config(state="disabled")
@@ -248,10 +308,88 @@ class AppPrincipal:
             messagebox.showinfo("Éxito", "El modelo ha sido recuperado exitosamente.")
             self.mostrar_mensaje(f"Modelo cargado desde: {archivo}")
 
+            # FIX: Actualizar scroll después de cargar
+            self.on_frame_configure()
+
         except Exception as e:
             error_msg = f"Error al cargar el modelo: {str(e)}\n\nEl archivo podría estar corrupto o no ser válido.\nIntente con otro archivo."
             messagebox.showerror("Error de Carga", error_msg)
             self.mostrar_mensaje(f"Error en carga: {str(e)}")
+
+    # === NUEVO: Crear UI de Predicción Dinámica ===
+    def crear_ui_prediccion(self):
+        if self.frame_prediccion:
+            # Limpiar si existe
+            for widget in self.frame_prediccion.winfo_children():
+                widget.destroy()
+            self.entries_prediccion.clear()
+
+        features = self.features if self.modelo_cargado else self.obtener_features()
+
+        if not features or self.model is None:
+            return
+
+        # Frame para predicción
+        self.frame_prediccion = ttk.LabelFrame(self.frame_left, text="Predicción con el Modelo", padding=10)
+        self.frame_prediccion.pack(pady=10, padx=10, fill="x")
+
+        # Campos dinámicos
+        for feat in features:
+            row_frame = ttk.Frame(self.frame_prediccion)
+            row_frame.pack(fill="x", pady=2)
+            ttk.Label(row_frame, text=f"{feat}:", width=20, anchor="w").pack(side="left")
+            entry = ttk.Entry(row_frame, width=15)
+            entry.pack(side="right", padx=5)
+            self.entries_prediccion[feat] = entry
+
+        # Botón de predicción
+        self.btn_prediccion = ttk.Button(self.frame_prediccion, text="Realizar Predicción",
+                                         command=self.realizar_prediccion)
+        self.btn_prediccion.pack(pady=10)
+
+        # Label para salida
+        self.label_salida = ttk.Label(self.frame_prediccion, text="Salida predicha: N/A",
+                                      font=("Helvetica", 12, "bold"), foreground="green")
+        self.label_salida.pack(pady=5)
+
+        # === FIX: Actualizar scroll después de agregar contenido dinámico ===
+        self.root.update_idletasks()
+        self.on_frame_configure()
+
+    # === NUEVO: Realizar Predicción ===
+    def realizar_prediccion(self):
+        features = self.features if self.modelo_cargado else self.obtener_features()
+        if not features or self.model is None:
+            messagebox.showwarning("Sin modelo", "No hay modelo disponible para predecir.")
+            return
+
+        # Recopilar valores
+        valores = []
+        for feat in features:
+            valor_str = self.entries_prediccion[feat].get().strip()
+            try:
+                valor = float(valor_str)
+                valores.append(valor)
+            except ValueError:
+                messagebox.showerror("Error de Entrada", f"Valor inválido para '{feat}': debe ser un número.")
+                return
+
+        if len(valores) != len(features):
+            messagebox.showerror("Error de Entrada", "Por favor, ingrese todos los valores de entrada.")
+            return
+
+        try:
+            # Predecir
+            X_pred = np.array(valores).reshape(1, -1)
+            y_pred = self.model.predict(X_pred)[0]
+
+            # Mostrar salida
+            self.label_salida.config(text=f"{self.target} predicha: {y_pred:.4f}")
+            self.mostrar_mensaje(f"Predicción realizada: {y_pred:.4f}")
+
+        except Exception as e:
+            messagebox.showerror("Error en Predicción", f"Error al calcular: {str(e)}")
+            self.mostrar_mensaje(f"Error en predicción: {str(e)}")
 
     # === PASO 1: Carga de Datos ===
     def crear_paso_carga(self):
@@ -438,13 +576,13 @@ class AppPrincipal:
         paned = ttk.PanedWindow(frame, orient="horizontal")
         paned.pack(fill="both", expand=True)
         
-        frame_left = ttk.Frame(paned)
+        self.frame_left = ttk.Frame(paned)  # <-- MODIFICADO: self para acceder
         frame_right = ttk.Frame(paned)
-        paned.add(frame_left, weight=1)
+        paned.add(self.frame_left, weight=1)
         paned.add(frame_right, weight=3)
 
         # Controles
-        self.btn_crear_modelo = ttk.Button(frame_left, text="Crear Modelo",
+        self.btn_crear_modelo = ttk.Button(self.frame_left, text="Crear Modelo",
                                         command=lambda: 
                                         self.ejecutar_con_carga(
                                             self.crear_modelo,
@@ -452,19 +590,22 @@ class AppPrincipal:
         self.btn_crear_modelo.pack(pady=20, padx=10, fill="x")
         
         # Botón Guardar Modelo
-        self.btn_guardar_modelo = ttk.Button(frame_left,
+        self.btn_guardar_modelo = ttk.Button(self.frame_left,
                                             text="Guardar Modelo",
                                             command=self.guardar_modelo,
                                             state="disabled")
         self.btn_guardar_modelo.pack(pady=10, padx=10, fill="x")
 
         # Descripción
-        lbl_desc = ttk.Label(frame_left, text="Descripción (Opcional):")
+        lbl_desc = ttk.Label(self.frame_left, text="Descripción (Opcional):")
         lbl_desc.pack(pady=(20, 5), padx=10, anchor="w")
-        self.text_descripcion = tk.Text(frame_left, height=10, width=20,
+        self.text_descripcion = tk.Text(self.frame_left, height=10, width=20,
                                         font=("Segoe UI", 10),
                                         bd=1, relief="solid")
         self.text_descripcion.pack(pady=5, padx=10, fill="both", expand=True)
+
+        # === NUEVO: Frame para Predicción (se creará dinámicamente) ===
+        # Se inicializa en None, se crea al tener modelo
 
         # Resultados (Gráfico y Métricas)
         self.frame_plot = ttk.Frame(frame_right, relief="sunken")
@@ -489,6 +630,13 @@ class AppPrincipal:
         if 0 <= indice < len(self.frames_pasos):
             self.frames_pasos[indice].pack(fill="both", expand=True)
             self.paso_actual = indice
+            
+            # === FIX: Actualizar scroll con update_idletasks y reconfig ===
+            self.root.update_idletasks()
+            self.content_frame.update_idletasks()
+            self.scrollable_frame.update_idletasks()
+            self.canvas.itemconfig(self.canvas_window, width=self.canvas.winfo_width())
+            self.on_frame_configure()
             
             titulos = [
                 "Paso 0: Bienvenida",
@@ -579,31 +727,26 @@ class AppPrincipal:
                 for feat, coef in zip(features, coefs):
                     signo = " + " if coef >= 0 else " - "
                     formula_str += f"{signo}{abs(coef):.6f} * {feat}"
-            else:
-                # Usar los guardados
-                formula_str = self.label_formula.cget("text").replace("Fórmula: ", "")
-                train_r2 = self.label_metrics.cget("text").split("R²: ")[1].split(".")[0]  # Simplificado, mejor recalcular si posible, pero ok
-                # Nota: Para precisión, si no hay datos, usa los guardados como están
-                metrics = {
-                    "train_r2": 0.0,  # Placeholder si no recalculable
-                    "test_r2": 0.0,
-                    "train_mse": 0.0,
-                    "test_mse": 0.0
-                }
 
-            # Datos a guardar (usa guardados si cargado)
+                metricas_dict = {
+                    "train_r2": float(train_r2),
+                    "test_r2": float(test_r2),
+                    "train_mse": float(train_mse),
+                    "test_mse": float(test_mse)
+                }
+            else:
+                # Usar las métricas cargadas
+                formula_str = self.label_formula.cget("text").replace("Fórmula: ", "").strip()
+                metricas_dict = self.metricas
+
+            # Datos a guardar
             datos_modelo = {
                 "modelo": self.model,
                 "features": features,
                 "target": target,
                 "formula": formula_str,
                 "descripcion": descripcion,
-                "metricas": {
-                    "train_r2": float(train_r2) if not self.modelo_cargado else metrics["train_r2"],
-                    "test_r2": float(test_r2) if not self.modelo_cargado else metrics["test_r2"],
-                    "train_mse": float(train_mse) if not self.modelo_cargado else metrics["train_mse"],
-                    "test_mse": float(test_mse) if not self.modelo_cargado else metrics["test_mse"]
-                },
+                "metricas": metricas_dict,
                 "fecha_guardado": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "version_app": "1.0"
             }
@@ -640,9 +783,16 @@ class AppPrincipal:
             # Activar botón de guardar
             self.btn_guardar_modelo.config(state="normal")
             
+            # === NUEVO: Habilitar Predicción ===
+            self.crear_ui_prediccion()
+            
             # Actualizar flag y navegación
             self.modelo_creado = True
             self.actualizar_estado_navegacion()
+
+            # FIX: Actualizar scroll después de crear modelo
+            self.root.update_idletasks()
+            self.on_frame_configure()
 
         except Exception as e:
             messagebox.showerror("Error al crear modelo", str(e))
@@ -664,6 +814,16 @@ class AppPrincipal:
         
         self.text_descripcion.delete("1.0", tk.END)
         self.descripcion_modelo = ""
+
+        # === NUEVO: Ocultar Predicción ===
+        if self.frame_prediccion:
+            self.frame_prediccion.pack_forget()
+            self.frame_prediccion = None
+            self.entries_prediccion.clear()
+
+        # === FIX: Actualizar scroll después de reset ===
+        self.root.update_idletasks()
+        self.on_frame_configure()
 
     # === Funcionalidad: Cargar Archivo ===
     def cargar_archivo(self):
@@ -689,6 +849,11 @@ class AppPrincipal:
             
             self.mostrar_mensaje(f"Datos cargados: {self.df.shape[0]} filas, {self.df.shape[1]} columnas.")
             self.mostrar_mensaje(detectar_valores_faltantes(self.df))
+
+            # FIX: Actualizar scroll después de cargar datos
+            self.root.update_idletasks()
+            self.on_frame_configure()
+            
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.mostrar_mensaje(f"Error: {str(e)}")
@@ -718,14 +883,6 @@ class AppPrincipal:
         seleccion = self.listbox_target.curselection()
         return self.listbox_target.get(seleccion[0]) if seleccion else None
 
-    def on_frame_configure(self, event=None):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def on_canvas_configure(self, event=None):
-        if self.scrollable_frame_window:
-            self.canvas.itemconfig(self.scrollable_frame_window,
-                                   width=event.width)
-
     def actualizar_tabla(self, df):
         self.tabla.delete(*self.tabla.get_children())
         self.tabla["columns"] = list(df.columns)
@@ -734,6 +891,10 @@ class AppPrincipal:
             self.tabla.column(col, width=120, anchor="center")
         for _, row in df.iterrows():
             self.tabla.insert("", "end", values=[str(v) for v in row])
+
+        # FIX: Actualizar scroll después de actualizar tabla
+        self.root.update_idletasks()
+        self.on_frame_configure()
 
     def actualizar_listboxes(self):
         if self.df is None:
@@ -884,8 +1045,14 @@ class AppPrincipal:
                 text=f"Métricas: Error al calcular - {e}")
 
     def actualizar_grafico(self):
+        # === FIX: Actualizar scroll después de actualizar gráfico ===
+        def update_after_graph():
+            self.root.update_idletasks()
+            self.on_frame_configure()
+
         # === MODIFICADO: Si cargado, omitir ===
         if self.modelo_cargado:
+            update_after_graph()
             return
         
         if self.canvas_widget:
@@ -905,38 +1072,65 @@ class AppPrincipal:
         features = self.obtener_features()
         target = self.obtener_target()
 
-        if len(features) > 1:
+        if self.model is None or self.X_test is None or self.y_test is None:
             ttk.Label(self.frame_plot, 
-                      text="No se puede graficar: Múltiples features (entradas).\n" \
-                      "El modelo fue creado, pero no es visualizable en 2D."
+                      text="Gráficos disponibles después de crear el modelo."
                       ).pack(padx=10, pady=10)
-            self.mostrar_mensaje("Gráfico no generado (múltiples features).")
+            update_after_graph()
             return
-            
+
+        # Calcular predicciones para test
+        y_test_pred = self.model.predict(self.X_test)
+
         try:
-            fig = Figure(figsize=(5, 3), dpi=120)
-            ax = fig.add_subplot(111)
-
-            feature_name = features[0]
-            ax.scatter(self.X_train[feature_name], self.y_train, color='blue',
-                        label='Entrenamiento', alpha=0.7)
-            ax.scatter(self.X_test[feature_name], self.y_test, color='red',
-                        label='Test', alpha=0.7)
-
-            X_all_series = pd.concat([self.X_train[feature_name], 
-                                      self.X_test[feature_name]])
-            X_line = np.linspace(X_all_series.min(), X_all_series.max(), 100
-                                 ).reshape(-1, 1)
-            X_line_df = pd.DataFrame(X_line, columns=[feature_name])
-            y_line = self.model.predict(X_line_df)
+            # Figura con dos subplots lado a lado
+            fig = Figure(figsize=(10, 4), dpi=120)
             
-            ax.plot(X_line, y_line, color='green', linewidth=3,
-                     label='Recta de Regresión')
-            ax.set_xlabel(feature_name)
-            ax.set_ylabel(target)
-            ax.set_title("Regresión Lineal: Ajuste del Modelo")
-            ax.legend()
-            ax.grid(True)
+            # Subplot izquierdo: Gráfico de regresión (solo si una feature)
+            ax1 = fig.add_subplot(121)
+            if len(features) == 1:
+                feature_name = features[0]
+                ax1.scatter(self.X_train[feature_name], self.y_train, color='blue',
+                            label='Entrenamiento', alpha=0.7)
+                ax1.scatter(self.X_test[feature_name], self.y_test, color='red',
+                            label='Test', alpha=0.7)
+
+                X_all_series = pd.concat([self.X_train[feature_name], 
+                                          self.X_test[feature_name]])
+                X_line = np.linspace(X_all_series.min(), X_all_series.max(), 100
+                                     ).reshape(-1, 1)
+                X_line_df = pd.DataFrame(X_line, columns=[feature_name])
+                y_line = self.model.predict(X_line_df)
+                
+                ax1.plot(X_line, y_line, color='green', linewidth=3,
+                         label='Recta de Regresión')
+                ax1.set_xlabel(feature_name)
+                ax1.set_ylabel(target)
+                ax1.set_title("Ajuste del Modelo")
+                ax1.legend()
+                ax1.grid(True)
+            else:
+                ax1.text(0.5, 0.5, 'Múltiples features\nNo visualizable en 2D', 
+                         ha='center', va='center', transform=ax1.transAxes, fontsize=12)
+                ax1.set_title("Gráfico de Regresión")
+                ax1.set_xlabel("")
+                ax1.set_ylabel("")
+
+            # Subplot derecho: Actual vs Predicho (siempre)
+            ax2 = fig.add_subplot(122)
+            ax2.scatter(self.y_test, y_test_pred, color='red', alpha=0.7, label='Test Set')
+            
+            # Línea de predicción perfecta (y = x)
+            min_y = min(self.y_test.min(), y_test_pred.min())
+            max_y = max(self.y_test.max(), y_test_pred.max())
+            ax2.plot([min_y, max_y], [min_y, max_y], 'k--', lw=2, label='Predicción Perfecta')
+            
+            ax2.set_xlabel('Valor Real (y)')
+            ax2.set_ylabel('Valor Predicho (ŷ)')
+            ax2.set_title("Conjunto Test: Real vs Predicho")
+            ax2.legend()
+            ax2.grid(True)
+            
             fig.tight_layout()
 
             canvas = FigureCanvasTkAgg(fig, master=self.frame_plot)
@@ -949,11 +1143,16 @@ class AppPrincipal:
             self.toolbar_widget.pack(side='bottom', fill='x')
             canvas.draw()
             
+            self.mostrar_mensaje("Gráficos actualizados: Ajuste del modelo y Real vs Predicho.")
+            
+            update_after_graph()
+            
         except Exception as e:
             ttk.Label(self.frame_plot, 
-                      text=f"Error al generar gráfico: {e}"
+                      text=f"Error al generar gráficos: {e}"
                       ).pack(padx=10, pady=10)
             self.mostrar_mensaje(f"Error al graficar: {e}")
+            update_after_graph()
 
 # === INICIO DE LA APLICACIÓN ===
 if __name__ == "__main__":
