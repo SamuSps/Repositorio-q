@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 import os
-from modelolienal import LinearRegression, joblib  # Ajusta imports según tu archivo
+from modelolineal import LinearRegression
+import joblib
 
 class TestModeloLineal(unittest.TestCase):
     @classmethod
