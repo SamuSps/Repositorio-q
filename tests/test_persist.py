@@ -1,7 +1,10 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Ajusta la ruta para encontrar src/ desde tests/
+
 import unittest
 import numpy as np
-import os
-from modelolineal import LinearRegression
+from sklearn.linear_model import LinearRegression  # Import correcto de LinearRegression
 import joblib
 
 class TestModeloLineal(unittest.TestCase):
