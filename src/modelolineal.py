@@ -13,9 +13,9 @@ from sklearn.metrics import mean_squared_error, r2_score
 # ==============================================
 # 2. Cargar el dataset (desde CSV, XLSX o DB)
 # ==============================================
-csv_file = r"C:\Users\Elena\Downloads\housing.csv"
-xlsx_file = r"C:\Users\Elena\Downloads\housing.xlsx"
-db_file = r"C:\Users\Elena\Downloads\housing.db"
+csv_file = "docs/housing.csv"
+xlsx_file = "docs/housing.xlsx"
+db_file = "docs/housing.db"
 
 data = None
 
