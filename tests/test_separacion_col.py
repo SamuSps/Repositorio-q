@@ -1,8 +1,13 @@
 import pytest
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from importacion_de_modulos import preprocesar_datos  # Ajusta la ruta según tu proyecto
+import sys 
+import os
+import unittest
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+from sklearn.model_selection import train_test_split
+from src.importacion_de_modulos import preprocesar_datos
 # --- Fixture de un DataFrame de prueba ---
 @pytest.fixture
 def df_prueba():
