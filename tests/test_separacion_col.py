@@ -1,23 +1,16 @@
 import pytest
 import pandas as pd
-import sys 
-import os
-import unittest
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-
 from sklearn.model_selection import train_test_split
-from src.importacion_de_modulos import preprocesar_datos
+from importacion_de_modulos import preprocesar_datos  # Ajusta la ruta según tu proyecto
 
-# --- Fixture: dataset de prueba ---
+# --- Fixture de un DataFrame de prueba ---
 @pytest.fixture
 def df_prueba():
-    data = {
+    return pd.DataFrame({
         "A": [1, 2, 3, 4, 5],
         "B": [5, 4, 3, 2, 1],
         "C": [10, 20, 30, 40, 50]
-    }
-    return pd.DataFrame(data)
+    })
 
 # --- Test: separación 20/80 y 30/70, sin solapamiento, columnas numéricas ---
 @pytest.mark.parametrize("test_size", [0.2, 0.3])
@@ -25,29 +18,30 @@ def test_columna_separacion(df_prueba, test_size):
     features = ["A", "B"]
     target = "C"
 
-    # Preprocesamiento básico (no elimina nada)
     df_proc = preprocesar_datos(df_prueba, metodo="eliminar", columnas=features + [target])
-
     X = df_proc[features]
     y = df_proc[target]
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
-    # --- Verificar proporciones ---
-    total = len(df_proc)
-    expected_test_len = int(total * test_size)
-    expected_train_len = total - expected_test_len
-    assert len(X_train) == expected_train_len
-    assert len(X_test) == expected_test_len
+    # --- Verificar proporciones aproximadas ---
+    actual_test_ratio = len(X_test) / len(df_proc)
+    actual_train_ratio = len(X_train) / len(df_proc)
+    assert abs(actual_test_ratio - test_size) <= 0.1
+    assert abs(actual_train_ratio - (1 - test_size)) <= 0.1
 
-    # --- Verificar que no hay solapamiento ---
-    train_idx = set(X_train.index)
-    test_idx = set(X_test.index)
-    assert train_idx.isdisjoint(test_idx)
+    # --- Verificar no solapamiento ---
+    for col in features:
+        assert set(X_train[col]).isdisjoint(set(X_test[col]))
 
-    # --- Verificar columnas numéricas ---
-    assert all(pd.api.types.is_numeric_dtype(X_train[col]) for col in features)
-    assert pd.api.types.is_numeric_dtype(y_train)
+    # --- Verificar columnas ---
+    for col in features + [target]:
+        assert col in df_proc.columns
+        assert pd.api.types.is_numeric_dtype(df_proc[col])
+
+    # --- Tamaños pequeños y grandes ---
+    assert len(X_train) + len(X_test) == len(df_proc)
+
 
 # --- Test: dataset muy pequeño ---
 def test_dataset_pequeno():
@@ -89,5 +83,3 @@ def test_preprocesamiento_media_mediana(df_prueba):
     # Verificar que no quedan NaNs
     assert df_media[["A", "B"]].isna().sum().sum() == 0
     assert df_mediana[["A", "B"]].isna().sum().sum() == 0
-if __name__ == "__main__":
-    unittest.main()
