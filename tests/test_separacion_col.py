@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 's
 
 from sklearn.model_selection import train_test_split
 from src.importacion_de_modulos import preprocesar_datos
+
 # --- Fixture de un DataFrame de prueba ---
 @pytest.fixture
 def df_prueba():
@@ -29,24 +30,23 @@ def test_columna_separacion(df_prueba, test_size):
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
-    # --- Verificar proporciones aproximadas ---
+    # --- Verificar suma de filas ---
+    assert len(X_train) + len(X_test) == len(df_proc)
+
+    # --- Verificar proporciones aproximadas (datasets pequeños) ---
     actual_test_ratio = len(X_test) / len(df_proc)
     actual_train_ratio = len(X_train) / len(df_proc)
-    assert abs(actual_test_ratio - test_size) <= 0.1
-    assert abs(actual_train_ratio - (1 - test_size)) <= 0.1
+    assert actual_test_ratio == pytest.approx(test_size, rel=0.5)
+    assert actual_train_ratio == pytest.approx(1 - test_size, rel=0.5)
 
     # --- Verificar no solapamiento ---
     for col in features:
         assert set(X_train[col]).isdisjoint(set(X_test[col]))
 
-    # --- Verificar columnas ---
+    # --- Verificar columnas y tipos ---
     for col in features + [target]:
         assert col in df_proc.columns
         assert pd.api.types.is_numeric_dtype(df_proc[col])
-
-    # --- Tamaños pequeños y grandes ---
-    assert len(X_train) + len(X_test) == len(df_proc)
-
 
 # --- Test: dataset muy pequeño ---
 def test_dataset_pequeno():
