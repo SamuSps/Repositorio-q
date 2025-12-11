@@ -1,7 +1,12 @@
 import pytest
 import pandas as pd
+import sys 
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 from sklearn.model_selection import train_test_split
-from importacion_de_modulos import preprocesar_datos
+from src.importacion_de_modulos import preprocesar_datos
 
 # --- Fixture: dataset de prueba ---
 @pytest.fixture
