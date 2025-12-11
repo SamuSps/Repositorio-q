@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 import sys 
 import os
+import unittest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
@@ -88,3 +89,5 @@ def test_preprocesamiento_media_mediana(df_prueba):
     # Verificar que no quedan NaNs
     assert df_media[["A", "B"]].isna().sum().sum() == 0
     assert df_mediana[["A", "B"]].isna().sum().sum() == 0
+if __name__ == "__main__":
+    unittest.main()

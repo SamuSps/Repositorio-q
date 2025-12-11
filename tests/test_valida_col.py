@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import unittest
 
 # Función auxiliar para validar que una columna sea numérica
 def es_columna_numerica(columna: pd.Series) -> bool:
@@ -58,3 +59,5 @@ def test_columna_float(df_float):
 # --- Test: columna string que representa número ---
 def test_columna_string_num(df_string_num):
     assert es_columna_numerica(df_string_num["A"]) == True
+if __name__ == "__main__":
+    unittest.main()
