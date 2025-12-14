@@ -7,7 +7,7 @@ import sqlite3
 # Permite importar desde src/
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from importacion_de_modulos import importar_datos
+from src.importacion_de_modulos import importar_datos
 
 
 # --------------------------------------------------

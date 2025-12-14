@@ -8,7 +8,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 # Permite importar desde src/
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from modelo import entrenar_modelo, predecir
+from src.modelo import entrenar_modelo, predecir
 
 
 # --------------------------------------------------
