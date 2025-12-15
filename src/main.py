@@ -193,7 +193,7 @@ class AppPrincipal:
         # Iniciar en el primer paso
         self.mostrar_paso(0)
  
-    # === FIX: Métodos para Scroll (Actualizados para evitar espacio vacío) ===
+    # === FIX: Métodos para Scroll ===
     def on_frame_configure(self, event=None):
         # Actualizar tamaños con update para asegurar cálculos precisos
         self.canvas.update_idletasks()
@@ -239,13 +239,13 @@ class AppPrincipal:
         )
         ttk.Label(frame, text=msg, justify="center").pack(pady=10)
  
-        # === NUEVO: Botón para cargar modelo existente ===
+        # Botón para cargar modelo existente ===
         btn_cargar_modelo = ttk.Button(frame,
                                        text="Cargar Modelo Existente",
                                        command=self.cargar_modelo_existente)
         btn_cargar_modelo.pack(pady=10)
  
-    # === NUEVO: Método para cargar modelo existente ===
+    # Método para cargar modelo existente ===
     def cargar_modelo_existente(self):
         archivo = filedialog.askopenfilename(
             title="Cargar Modelo de Regresión Lineal",
@@ -296,7 +296,7 @@ class AppPrincipal:
             self.btn_crear_modelo.config(state="disabled")
             self.btn_guardar_modelo.config(state="normal")  # Permitir re-guardar si se edita desc.
  
-            # === NUEVO: Habilitar Predicción ===
+            # Habilitar Predicción ===
             self.crear_ui_prediccion()
  
             # Navegar al Paso 3 y bloquear navegación
@@ -316,7 +316,7 @@ class AppPrincipal:
             messagebox.showerror("Error de Carga", error_msg)
             self.mostrar_mensaje(f"Error en carga: {str(e)}")
  
-    # === NUEVO: Crear UI de Predicción Dinámica ===
+    # Crear UI de Predicción Dinámica ===
     def crear_ui_prediccion(self):
         if self.frame_prediccion:
             # Limpiar si existe
@@ -356,7 +356,7 @@ class AppPrincipal:
         self.root.update_idletasks()
         self.on_frame_configure()
  
-    # === NUEVO: Realizar Predicción ===
+    # Realizar Predicción ===
     def realizar_prediccion(self):
         features = self.features if self.modelo_cargado else self.obtener_features()
         if not features or self.model is None:
@@ -478,6 +478,8 @@ class AppPrincipal:
                         variable=self.metodo_var, value="eliminar").pack(anchor="w")
         ttk.Radiobutton(lbl_clean, text="Rellenar (Media)",
                         variable=self.metodo_var, value="media").pack(anchor="w")
+        ttk.Radiobutton(lbl_clean, text="Rellenar (Mediana)",
+                        variable=self.metodo_var, value="mediana").pack(anchor="w")
        
         f_const = ttk.Frame(lbl_clean)
         f_const.pack(anchor="w", pady=2)
@@ -524,7 +526,7 @@ class AppPrincipal:
                                    "Por favor selecciona Features y Target.")
             return
  
-        # 2. Aplicar Preprocesamiento (Copiado de tu lógica anterior)
+        # 2. Aplicar Preprocesamiento
         try:
             metodo = self.metodo_var.get()
             valor = self.entry_constante.get().strip()
@@ -542,7 +544,7 @@ class AppPrincipal:
         except Exception as e:
             raise Exception(f"Error en Limpieza: {e}")
  
-        # 3. Aplicar División (Copiado de tu lógica anterior)
+        # 3. Aplicar División
         try:
             if len(self.df_procesado) < 5:
                 raise Exception("Datos insuficientes tras la limpieza.")
@@ -1161,4 +1163,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = AppPrincipal(root)
     root.mainloop()
- 
