@@ -6,7 +6,7 @@ Desarrollar una app que permita crear y visualizar modelos de regresión lineal 
 
 # Estructura
 - `src/`: Código fuente.
-- `files/`: archivos para la ejecución.
+- `files/`: Archivos para la ejecución.
 - `docs/`: Documentación.
 - `tests/`: Tests de pruebas.
 
