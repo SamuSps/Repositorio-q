@@ -67,3 +67,7 @@ La aplicación es una GUI de escritorio monolítica escrita en Python utilizando
 No se utilizan frameworks externos complejos, lo que facilita su mantenimiento y ejecución sin compilación.
 
 Para más información sobre la contribución al proyecto leer documento "CONTRIBUTING.md"
+
+# Intsrucciones publicación
+
+Por último, para acceder al release final del proyecto debes acceder al apartado releases de GitHub, en este apartado también hay un tag en el que se explican las funcionalidades principales del proyecto, junto con los archivos ZIP del código fuente. 
