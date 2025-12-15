@@ -148,7 +148,7 @@ class AppPrincipal:
         # TRUCO: Obtenemos el color gris del sistema para que el canvas sea invisible
         system_bg = self.root.cget("bg") 
         
-        self.canvas = tk.Canvas(canvas_frame, bg=system_bg, highlightthickness=0)
+        self.canvas = tk.Canvas(canvas_frame, bg=system_bg, highlightthickness=0, takefocus=0)
         self.scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
 
@@ -217,7 +217,15 @@ class AppPrincipal:
             width=canvas_width,
             height=height_to_use
         )
- 
+    def _enfocar_seed(self):
+        try:
+            if hasattr(self, "entry_seed") and self.entry_seed.winfo_exists() and self.entry_seed.winfo_viewable():
+                self.root.focus_force()
+                self.entry_seed.focus_force()
+                self.entry_seed.icursor(tk.END)
+        except Exception:
+            pass
+
     # === PASO 0: Bienvenida ===
     def crear_paso_bienvenida(self):
         frame = ttk.Frame(self.content_frame)
@@ -687,6 +695,7 @@ class AppPrincipal:
             puede_avanzar = self.archivo_cargado
         elif self.paso_actual == 2:  # Configuración (Nuevo paso unificado)
             # Avanzamos solo si se ha ejecutado la división correctamente
+            self.root.after_idle(self._enfocar_seed)
             puede_avanzar = self.division_realizada
         elif self.paso_actual == 3:  # Modelo (Fin)
             self.btn_siguiente.config(text="Finalizar", state="disabled")
