@@ -146,7 +146,7 @@ class AppPrincipal:
         canvas_frame = ttk.Frame(main_frame)
         canvas_frame.pack(fill="both", expand=True, pady=(0, 10))
  
-        self.canvas = tk.Canvas(canvas_frame, bg="white")
+        self.canvas = tk.Canvas(canvas_frame, highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
  
@@ -493,21 +493,6 @@ class AppPrincipal:
                                    text=" 3. Tamaño del Test ", padding=10)
         lbl_split.pack(side="right",
                         fill="both", expand=True, padx=(5, 0))
-        # --- Semilla para división reproducible ---
-        f_seed = ttk.Frame(lbl_split)
-        f_seed.pack(fill="x", pady=(10, 0))
-
-        ttk.Label(f_seed, text="Semilla (reproducible):").pack(side="left")
-
-        self.entry_seed = ttk.Entry(
-        f_seed,
-        textvariable=self.seed_var,
-        width=10,
-        justify="center"
-        )
-        self.entry_seed.pack(side="right")
-
-        
        
         ttk.Label(lbl_split,
                   text="¿Cuánto separar para probar?").pack(pady=(0, 5))
@@ -926,117 +911,96 @@ class AppPrincipal:
             self.listbox_target.insert(tk.END, col)
  
     # === Funcionalidad: Preprocesamiento ===
-def procesar_todo_en_uno(self):
-    # 1. Validar selección de variables
-    features = self.obtener_features()
-    target = self.obtener_target()
-   
-    if not features or not target:
-        messagebox.showwarning("Faltan datos",
-                               "Por favor selecciona Features y Target.")
-        return
-
-    # 2. Aplicar preprocesamiento
-    try:
+    def aplicar_preprocesado(self):
+        if self.df is None:
+            messagebox.showwarning("Advertencia", "Primero carga un archivo.")
+            return
+ 
         metodo = self.metodo_var.get()
         valor = self.entry_constante.get().strip()
         valor_constante = float(valor) if valor else None
-       
-        columnas_modelo = features + [target]
-        df_temp = self.df.copy()
-       
-        self.df_procesado = preprocesar_datos(df_temp,
-                                              metodo,
-                                              columnas_modelo,
-                                              valor_constante)
-    except Exception as e:
-        raise Exception(f"Error en Limpieza: {e}")
-
-    # 3. División con semilla reproducible
-    try:
-        if len(self.df_procesado) < 5:
-            raise Exception("Datos insuficientes tras la limpieza.")
+ 
+        try:
+            features = self.obtener_features()
+            target = self.obtener_target()
+            if not target:
+                raise ValueError("Selecciona una columna de salida (Target).")
+            if not features:
+                raise ValueError("Selecciona mínimo una columna de entrada.")
            
-        test_size = self.test_split_var.get() / 100.0
-        
-        # Validar semilla
-        try:
-            seed = int(self.seed_var.get())
-        except ValueError:
-            seed = 42
-            self.seed_var.set("42")
-        
-        X = self.df_procesado[features]
-        y = self.df_procesado[target]
-       
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=test_size, random_state=seed
-        )
-       
-        # Éxito total
-        self.division_realizada = True
-        self.actualizar_estado_navegacion()
-        self.mostrar_mensaje(
-            f"Proceso completo. Train: {len(self.X_train)} | Test: {len(self.X_test)} | Semilla: {seed}"
-        )
-        messagebox.showinfo(
-            "Éxito",
-            "Datos procesados y divididos de forma reproducible.\nPuedes avanzar."
-        )
-    except Exception as e:
-        raise Exception(f"Error en División: {e}")
-
-
-def aplicar_division(self):
-    if self.df_procesado is None:
-        messagebox.showwarning("Advertencia",
-            "Primero debe aplicar el preprocesamiento de datos.")
-        return
-    if len(self.df_procesado) < 5:
-        messagebox.showerror("Error",
-            "No hay suficientes datos para realizar la división"
-            " (se requieren al menos 5 filas).")
-        return
-
-    try:
-        self.resetar_resultados_modelo()
-       
-        test_size = self.test_split_var.get() / 100.0
-        
-        # Validación semilla
-        try:
-            seed = int(self.seed_var.get())
-        except ValueError:
-            seed = 42
-            self.seed_var.set("42")
-
-        features = self.obtener_features()
-        target = self.obtener_target()
-        if not target or not features:
-            messagebox.showerror("Error",
-                "Asegúrese de tener features y target seleccionados.")
+            self.X_train = self.X_test = self.y_train = self.y_test = None
+            self.resetar_resultados_modelo()
+ 
+            columnas_modelo = features + [target]
+            df_temp = self.df.copy()
+            df_procesado_parcial = preprocesar_datos(
+                df_temp, metodo, columnas_modelo, valor_constante
+            )
+            self.df_procesado = df_procesado_parcial.copy()
+ 
+            self.actualizar_tabla(self.df_procesado)
+           
+            # Actualizar flag y navegación
+            self.preprocesado_aplicado = True
+            self.actualizar_estado_navegacion()
+           
+            self.mostrar_mensaje("Preprocesado aplicado correctamente"
+            " (solo en columnas del modelo).")
+            self.mostrar_mensaje(detectar_valores_faltantes(
+                self.df_procesado))
+ 
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.mostrar_mensaje(f"Error: {str(e)}")
+ 
+    # === Funcionalidad: División de Datos ===
+    def aplicar_division(self):
+        if self.df_procesado is None:
+            messagebox.showwarning("Advertencia",
+                "Primero debe aplicar el preprocesamiento de datos.")
             return
-
-        X = self.df_procesado[features]
-        y = self.df_procesado[target]
-
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=test_size, random_state=seed
-        )
-
-        msg_total = f"Datos divididos correctamente (Semilla={seed})."
-        msg_train = f"Conjunto Entrenamiento: {len(self.X_train)} filas."
-        msg_test = f"Conjunto Test: {len(self.X_test)} filas."
-       
-        self.division_realizada = True
-        self.actualizar_estado_navegacion()
-       
-        self.mostrar_mensaje(f"{msg_total}\n{msg_train}\n{msg_test}")
-
-    except Exception as e:
-        messagebox.showerror("Error", str(e))
-        self.mostrar_mensaje(f"Error en la división: {str(e)}")
-
+        if len(self.df_procesado) < 5:
+            messagebox.showerror("Error",
+                "No hay suficientes datos para realizar la división"
+                " (se requieren al menos 5 filas).")
+            return
+ 
+        try:
+            self.resetar_resultados_modelo()
+           
+            test_size_pct = self.test_split_var.get()
+            test_size_float = test_size_pct / 100.0
+            seed = int(self.seed_var.get()) if self.seed_var.get().isdigit() else 42
+            if self.seed_var.get() == "": self.seed_var.set("42")
+ 
+            features = self.obtener_features()
+            target = self.obtener_target()
+            if not target or not features:
+                messagebox.showerror("Error",
+                    "Asegúrese de tener features y target seleccionados.")
+                return
+ 
+            X = self.df_procesado[features]
+            y = self.df_procesado[target]
+ 
+            self.X_train, self.X_test, \
+            self.y_train, self.y_test = train_test_split(
+                X, y, test_size=test_size_float, random_state=seed
+            )
+ 
+            msg_total = f"Datos divididos correctamente (Semilla={seed})."
+            msg_train = f"Conjunto Entrenamiento: {len(self.X_train)} filas."
+            msg_test = f"Conjunto Test: {len(self.X_test)} filas."
+           
+            # Actualizar flag y navegación
+            self.division_realizada = True
+            self.actualizar_estado_navegacion()
+           
+            self.mostrar_mensaje(f"{msg_total}\n{msg_train}\n{msg_test}")
+ 
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.mostrar_mensaje(f"Error en la división: {str(e)}")
  
     def actualizar_resultados_modelo(self):
         # === MODIFICADO: Si cargado, no recalcular ===
