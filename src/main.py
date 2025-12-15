@@ -506,6 +506,15 @@ class AppPrincipal:
                                       self.label_split_pct.config(
                                           text=f"{float(v):.0f} %"))
         self.slider_split.pack(side="left", fill="x", expand=True)
+
+        ttk.Label(lbl_split, text="Semilla (opcional):").pack(anchor="w", pady=(10, 0))
+
+        self.entry_seed = ttk.Entry(
+            lbl_split,
+            textvariable=self.seed_var,
+            width=15
+        )
+        self.entry_seed.pack(anchor="w")
  
         # === BOTÓN DE ACCIÓN ===
         self.btn_procesar_todo = ttk.Button(frame,
