@@ -134,91 +134,89 @@ class AppPrincipal:
         # === Estructura Principal ===
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
- 
-        # 1. Header (Título del paso actual)
+
+        # 1. Header
         self.header_label = ttk.Label(main_frame,
                                       text="Paso 0: Bienvenida",
-                                        font=("Helvetica", 16, "bold"))
+                                      font=("Helvetica", 16, "bold"))
         self.header_label.pack(pady=(0, 10))
- 
-        # === FIX: Canvas con Scrollbar para Content Area ===
-        # Frame contenedor para canvas y scrollbar
+
+        # === FIX: Canvas con el color del sistema ===
         canvas_frame = ttk.Frame(main_frame)
         canvas_frame.pack(fill="both", expand=True, pady=(0, 10))
- 
-        self.canvas = tk.Canvas(canvas_frame, highlightthickness=0)
+
+        # TRUCO: Obtenemos el color gris del sistema para que el canvas sea invisible
+        system_bg = self.root.cget("bg") 
+        
+        self.canvas = tk.Canvas(canvas_frame, bg=system_bg, highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
- 
+
         self.scrollable_frame.bind(
             "<Configure>",
             self.on_frame_configure
         )
- 
+
         self.scrollbar.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
- 
+
         self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
- 
+
         self.canvas.bind("<Configure>", self.on_canvas_configure)
- 
-        # 2. Content Area (Ahora dentro del scrollable_frame)
+
+        # 2. Content Area
         self.content_frame = ttk.Frame(self.scrollable_frame)
         self.content_frame.pack(fill="both", expand=True)
- 
+
         self.frames_pasos = []
-        # Inicialización de todos los pasos
+        # Inicialización de pasos
         self.crear_paso_bienvenida()       # Paso 0
         self.crear_paso_carga()            # Paso 1
-        self.crear_paso_configuracion()    # Paso 2 (NUEVO UNIFICADO)
-        self.crear_paso_modelo()           # Paso 3 (Antes era el 5)
- 
-        # 3. Footer (Botones de Navegación + Barra de Estado)
+        self.crear_paso_configuracion()    # Paso 2
+        self.crear_paso_modelo()           # Paso 3
+
+        # 3. Footer
         footer_frame = ttk.Frame(main_frame)
         footer_frame.pack(fill="x", pady=10)
- 
+
         self.btn_anterior = ttk.Button(footer_frame, text="< Anterior", command=lambda: self.navegar(-1), state="disabled")
         self.btn_anterior.pack(side="left")
- 
+
         self.btn_siguiente = ttk.Button(footer_frame, text="Siguiente >", command=lambda: self.navegar(1))
         self.btn_siguiente.pack(side="right")
- 
+
         # Barra de Estado
         status_frame = ttk.LabelFrame(main_frame, text="Estado")
         status_frame.pack(fill="x", pady=(5, 0))
         self.lbl_status = ttk.Label(status_frame, textvariable=self.status_var, foreground="blue")
         self.lbl_status.pack(fill="x", padx=5, pady=5)
- 
-        # Iniciar en el primer paso
+
         self.mostrar_paso(0)
  
     # === FIX: Métodos para Scroll ===
     def on_frame_configure(self, event=None):
-        # Actualizar tamaños con update para asegurar cálculos precisos
-        self.canvas.update_idletasks()
-        self.scrollable_frame.update_idletasks()
-       
-        # Actualizar scrollregion
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-       
-        # Ajustar tamaño de la ventana del canvas
-        canvas_width = self.canvas.winfo_width()
-        content_height = self.scrollable_frame.winfo_reqheight()
-        self.canvas.itemconfig(self.canvas_window,
-                               width=canvas_width,
-                               height=content_height)
-       
-        # FIX PRINCIPAL: Si el contenido es más corto que el canvas, redimensionar el canvas para eliminar espacio vacío
-        canvas_height = self.canvas.winfo_height()
-        if content_height < canvas_height:
-            self.canvas.configure(height=content_height)
  
     def on_canvas_configure(self, event=None):
-        # Ajustar ancho de la ventana del canvas al ancho del canvas
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
-        # Reconfigurar scroll y heights si es necesario
-        self.on_frame_configure()
+        canvas_width = event.width
+        canvas_height = event.height
+        
+        # Obtenemos la altura mínima que necesita el contenido
+        content_min_height = self.scrollable_frame.winfo_reqheight()
+
+        # Si la pantalla es más alta que el contenido, usamos la altura de la pantalla
+        # para estirar el frame interno y que no queden huecos.
+        if canvas_height > content_min_height:
+            height_to_use = canvas_height
+        else:
+            height_to_use = content_min_height
+
+        self.canvas.itemconfig(
+            self.canvas_window,
+            width=canvas_width,
+            height=height_to_use
+        )
  
     # === PASO 0: Bienvenida ===
     def crear_paso_bienvenida(self):
