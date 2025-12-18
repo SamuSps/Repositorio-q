@@ -9,6 +9,9 @@ Desarrollar una app que permita crear y visualizar modelos de regresión lineal 
 - `files/`: Archivos para la ejecución.
 - `docs/`: Documentación.
 - `tests/`: Tests de pruebas.
+- `images/`: Imágenes para el manual de usuario.
+
+
 
 # Características principales
 - **Carga de datos**: Soporte para archivos CSV y Excel.
@@ -67,3 +70,107 @@ La aplicación es una GUI de escritorio monolítica escrita en Python utilizando
 No se utilizan frameworks externos complejos, lo que facilita su mantenimiento y ejecución sin compilación.
 
 Para más información sobre la contribución al proyecto leer documento "CONTRIBUTING.md"
+
+
+
+# Manual de usuario 
+
+A continuación se explican  las distintas funcionalidades
+implementadas junto con capturas de pantalla.
+
+## 1. Carga de datos
+**Escenario positivo:**  
+- Cargar archivos CSV, Excel o SQLite válidos.  
+- Los datos se cargan correctamente y se muestra mensaje de éxito.  
+![Captura carga correcta](images/carga1.png)  
+
+**Escenario negativo:**  
+- Cualquier otro tipo de archivo no es mostrado al usuario.  
+- No se produce error, simplemente no se permite cargar el archivo.  
+
+
+## 2. Selección de columnas
+**Escenario positivo:**  
+- Seleccionar columnas de entrada (features) y salida (target).  
+- Se muestra mensaje: “Datos son procesados y divididos. Puedes avanzar”.  
+- Si se seleccionan varias columnas de entrada funciona igual que con una sola.  
+- Una vez seleccionadas, las columnas target no se pueden quitar.  
+![Captura selección correcta](images/seleccion.png)
+![Captura selección correcta](images/selec_varias.png)
+
+
+**Escenario negativo:**  
+- No seleccionar columnas de entrada ni de salida.  
+- Mensaje de error: “Por favor selecciona features y target”.  
+![Captura selección incorrecta](images/error_target.png)
+![Captura selección incorrecta](images/error_target2.png)
+![Captura selección incorrecta](images/error_feature.png)
+
+
+## 3. Preprocesado de datos
+
+**Escenarios positivos:**  
+- **Eliminar filas con valores faltantes:** Datos limpios, mensaje de éxito.  
+- **Rellenar con media:** Si la columna es numérica, se reemplazan valores faltantes por la media.  
+- **Rellenar con valor constante:** Los valores se reemplazan correctamente.  
+- **Rellenar con mediana (opcional a añadir):** Reemplaza valores faltantes con la mediana de la columna.  
+![Captura preprocesado correcta](images/eliminar_media.png)
+![Captura preprocesado correcta](images/eliminar_mediana.png)
+![Captura preprocesado correcta](images/valor_cte.png)
+
+
+**Escenario negativo:**  
+- Rellenar con un valor no numérico en columna numérica.  
+- Mensaje de error: `error en limpieza: could not convert string to float: ''`.  
+![Captura preprocesado error](images/error_val_cte.png)
+
+
+## 4. División de datos
+**Escenario positivo:**  
+- Split 20% de froma predeterminada test aplicado correctamente, mensaje de éxito.  
+![Captura división correcto](images/error_division.png)
+
+
+**Escenarios negativos:**  
+- Si preprocesado eliminó casi todas las filas: “Error en División: Datos insuficientes tras la limpieza”.  
+![Captura división error](images/error_datos_insuf.png)
+
+
+## 5. Creación del modelo
+**Escenario positivo:**  
+- Crear modelo con datos válidos.  
+- Se muestran: modelo entrenado, fórmula, métricas y gráfico.  
+![Captura modelo correcto](images/crea_modelo.png)
+
+**Escenario negativo:**  
+- Intentar crear modelo sin dividir los datos:  
+  Mensaje: “Primero, debe dividir los datos en conjuntos de entrenamiento y test”.  
+![Captura modelo error](images/error_no_division.png)
+
+## 6. Predicción
+**Escenarios positivos:**  
+- Ingresar valores numéricos en todas las features → predicción correcta.  
+- No se puede predecir antes de cargar datos → botón deshabilitado.  
+![Captura predicción correcta](images/prediccion.png)
+
+**Escenario negativo:**  
+- Ingresar texto en lugar de número → mensaje de error, no se realiza la predicción.  
+![Captura predicción error](images/prediccion_mal.png)
+
+## 7. Guardado y carga de modelo
+**Escenario positivo:**  
+- Guardar modelo → archivo creado y mensaje de éxito.  
+- Cargar modelo `.pkl` válido → features y target actualizados, predicción habilitada.  
+![Captura guardar modelo](images/crea_modelo.png)
+![Captura cargar modelo](images/modelo_cargado.png)
+
+**Escenario negativo:**  
+- Cargar archivo corrupto o vacío → mensaje de error.  
+![Captura cargar modelo error](images/datos_insuf_error.png)
+
+
+## 8. Manejo de errores generales
+- Botón “Siguiente” deshabilitado si no se ha cargado un archivo → evita errores de flujo.  
+![Captura botón deshabilitado](images/boton_deshabilitado.png)
+
+
