@@ -515,7 +515,8 @@ class AppPrincipal:
                                           text=f"{float(v):.0f} %"))
         self.slider_split.pack(side="left", fill="x", expand=True)
 
-        ttk.Label(lbl_split, text="Semilla (opcional):").pack(anchor="w", pady=(10, 0))
+        ttk.Label(lbl_split, text="Semilla (opcional):").pack(anchor="w",
+                                                               pady=(10, 0))
 
         self.entry_seed = ttk.Entry(
             lbl_split,
@@ -578,7 +579,11 @@ class AppPrincipal:
             # ÉXITO TOTAL
             self.division_realizada = True  # Usamos este flag como "Todo listo"
             self.actualizar_estado_navegacion()
-            self.mostrar_mensaje(f"Proceso completo. Train: {len(self.X_train)} | Test: {len(self.X_test)}")
+            self.mostrar_mensaje(
+                                f"Proceso completo. "
+                                f"Train: {len(self.X_train)} | "
+                                f"Test: {len(self.X_test)}"
+                                )
             messagebox.showinfo("Éxito",
                 "Datos procesados y divididos.\nPuedes avanzar.")
            
@@ -600,7 +605,8 @@ class AppPrincipal:
         paned.add(frame_right, weight=3)
  
         # Controles
-        self.btn_crear_modelo = ttk.Button(self.frame_left, text="Crear Modelo",
+        self.btn_crear_modelo = ttk.Button(self.frame_left,
+                                        text="Crear Modelo",
                                         command=lambda:
                                         self.ejecutar_con_carga(
                                             self.crear_modelo,
@@ -653,7 +659,8 @@ class AppPrincipal:
             self.root.update_idletasks()
             self.content_frame.update_idletasks()
             self.scrollable_frame.update_idletasks()
-            self.canvas.itemconfig(self.canvas_window, width=self.canvas.winfo_width())
+            self.canvas.itemconfig(self.canvas_window, 
+                                   width=self.canvas.winfo_width())
             self.on_frame_configure()
            
             titulos = [
@@ -707,7 +714,11 @@ class AppPrincipal:
     # === Guardar Modelo ===
     def guardar_modelo(self):
         # === MODIFICADO: Usar features/target cargados si aplica ===
-        features = self.features if self.modelo_cargado else self.obtener_features()
+        features = (
+                    self.features
+                    if self.modelo_cargado
+                    else self.obtener_features()
+                    )
         target = self.target if self.modelo_cargado else self.obtener_target()
  
         if self.model is None:
@@ -755,7 +766,12 @@ class AppPrincipal:
                 }
             else:
                 # Usar las métricas cargadas
-                formula_str = self.label_formula.cget("text").replace("Fórmula: ", "").strip()
+                formula_str = (
+                                self.label_formula
+                                .cget("text")
+                                .replace("Fórmula: ", "")
+                                .strip()
+                                )
                 metricas_dict = self.metricas
  
             # Datos a guardar
@@ -791,8 +807,11 @@ class AppPrincipal:
         if not descripcion:
             self.mostrar_mensaje("Modelo creado sin descripción (opcional).")
         else:
-            self.mostrar_mensaje(f"Modelo creado. Descripción guardada ({len(descripcion)} caracteres).")
-           
+            self.mostrar_mensaje(
+                                 f"Modelo creado. "
+                                 f"Descripción guardada "
+                                 f"({len(descripcion)} caracteres)."
+                                )
         try:
             self.model = LinearRegression()
             self.model.fit(self.X_train, self.y_train)
@@ -823,8 +842,13 @@ class AppPrincipal:
         self.btn_guardar_modelo.config(state="disabled")
  
         self.label_formula.config(text="Fórmula: N/A")
-        self.label_metrics.config(text="Métricas:\n  Train R²: N/A | Test R²: N/A\n  Train MSE: N/A | Test MSE: N/A")
-       
+        self.label_metrics.config(
+                                  text=(
+                                        "Métricas:\n"
+                                        "  Train R²: N/A | Test R²: N/A\n"
+                                        "  Train MSE: N/A | Test MSE: N/A"
+                                        )
+                                    )
         # Limpiar gráfico
         for widget in self.frame_plot.winfo_children():
             widget.destroy()
@@ -867,7 +891,11 @@ class AppPrincipal:
             self.archivo_cargado = True
             self.actualizar_estado_navegacion()
            
-            self.mostrar_mensaje(f"Datos cargados: {self.df.shape[0]} filas, {self.df.shape[1]} columnas.")
+            self.mostrar_mensaje(
+                                 f"Datos cargados: "
+                                 f"{self.df.shape[0]} filas, "
+                                 f"{self.df.shape[1]} columnas."
+                                 )
             self.mostrar_mensaje(detectar_valores_faltantes(self.df))
  
             # FIX: Actualizar scroll después de cargar datos
@@ -986,7 +1014,11 @@ class AppPrincipal:
            
             test_size_pct = self.test_split_var.get()
             test_size_float = test_size_pct / 100.0
-            seed = int(self.seed_var.get()) if self.seed_var.get().isdigit() else 42
+            seed = (
+                    int(self.seed_var.get())
+                    if self.seed_var.get().isdigit()
+                    else 42
+                    )
             if self.seed_var.get() == "": self.seed_var.set("42")
  
             features = self.obtener_features()
@@ -1054,10 +1086,20 @@ class AppPrincipal:
             test_r2 = r2_score(self.y_test, y_test_pred)
             test_mse = mean_squared_error(self.y_test, y_test_pred)
  
-            metrics_str = "Métricas (R²: Coef. Determinación | ECM: Error Cuadrático Medio):\n"
-            metrics_str += f"  [Entrenamiento]\t R²: {train_r2:.4f}\t | ECM: {train_mse:.4f}\n"
-            metrics_str += f"  [Test]\t\t R²: {test_r2:.4f}\t | ECM: {test_mse:.4f}"
-           
+            metrics_str = (
+                            "Métricas (R²: Coef. Determinación | "
+                            "ECM: Error Cuadrático Medio):\n"
+                            )
+            metrics_str += (
+                            f"  [Entrenamiento]\t "
+                            f"R²: {train_r2:.4f}\t | "
+                            f"ECM: {train_mse:.4f}\n"
+                            )
+            metrics_str += (
+                            f"  [Test]\t\t "
+                            f"R²: {test_r2:.4f}\t | "
+                            f"ECM: {test_mse:.4f}"
+                            ) 
             self.label_metrics.config(text=metrics_str)
            
         except Exception as e:
@@ -1110,14 +1152,17 @@ class AppPrincipal:
             ax1 = fig.add_subplot(121)
             if len(features) == 1:
                 feature_name = features[0]
-                ax1.scatter(self.X_train[feature_name], self.y_train, color='blue',
+                ax1.scatter(self.X_train[feature_name],
+                            self.y_train, color='blue',
                             label='Entrenamiento', alpha=0.7)
-                ax1.scatter(self.X_test[feature_name], self.y_test, color='red',
+                ax1.scatter(self.X_test[feature_name], self.y_test,
+                            color='red',
                             label='Test', alpha=0.7)
  
                 X_all_series = pd.concat([self.X_train[feature_name],
                                           self.X_test[feature_name]])
-                X_line = np.linspace(X_all_series.min(), X_all_series.max(), 100
+                X_line = np.linspace(X_all_series.min(),
+                                     X_all_series.max(), 100
                                      ).reshape(-1, 1)
                 X_line_df = pd.DataFrame(X_line, columns=[feature_name])
                 y_line = self.model.predict(X_line_df)
@@ -1130,20 +1175,23 @@ class AppPrincipal:
                 ax1.legend()
                 ax1.grid(True)
             else:
-                ax1.text(0.5, 0.5, 'Múltiples features\nNo visualizable en 2D',
-                         ha='center', va='center', transform=ax1.transAxes, fontsize=12)
+                ax1.text(0.5,0.5, 'Múltiples features\nNo visualizable en 2D',
+                         ha='center', va='center', 
+                         transform=ax1.transAxes, fontsize=12)
                 ax1.set_title("Gráfico de Regresión")
                 ax1.set_xlabel("")
                 ax1.set_ylabel("")
  
             # Subplot derecho: Actual vs Predicho (siempre)
             ax2 = fig.add_subplot(122)
-            ax2.scatter(self.y_test, y_test_pred, color='red', alpha=0.7, label='Test Set')
+            ax2.scatter(self.y_test, y_test_pred, color='red', 
+                        alpha=0.7, label='Test Set')
            
             # Línea de predicción perfecta (y = x)
             min_y = min(self.y_test.min(), y_test_pred.min())
             max_y = max(self.y_test.max(), y_test_pred.max())
-            ax2.plot([min_y, max_y], [min_y, max_y], 'k--', lw=2, label='Predicción Perfecta')
+            ax2.plot([min_y, max_y], [min_y, max_y], 'k--', lw=2,
+                     label='Predicción Perfecta')
            
             ax2.set_xlabel('Valor Real (y)')
             ax2.set_ylabel('Valor Predicho (ŷ)')
@@ -1163,8 +1211,10 @@ class AppPrincipal:
             self.toolbar_widget.pack(side='bottom', fill='x')
             canvas.draw()
            
-            self.mostrar_mensaje("Gráficos actualizados: Ajuste del modelo y Real vs Predicho.")
-           
+            self.mostrar_mensaje(
+                                 "Gráficos actualizados: "
+                                 "Ajuste del modelo y Real vs Predicho."
+                                 )
             update_after_graph()
            
         except Exception as e:
