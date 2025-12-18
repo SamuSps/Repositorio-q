@@ -96,7 +96,7 @@ implementadas junto con capturas de pantalla.
 - Si se seleccionan varias columnas de entrada funciona igual que con una sola.  
 - Una vez seleccionadas, las columnas target no se pueden quitar.  
 ![Captura selección correcta](images/seleccion.png)
-![Captura selección correcta](images/selec_varias.png)
+![Captura selección correcta](images/selecc_varias.png)
 
 
 **Escenario negativo:**  
@@ -128,7 +128,7 @@ implementadas junto con capturas de pantalla.
 ## 4. División de datos
 **Escenario positivo:**  
 - Split 20% de froma predeterminada test aplicado correctamente, mensaje de éxito.  
-![Captura división correcto](images/error_division.png)
+![Captura división correcto](images/valor_cte.png)
 
 
 **Escenarios negativos:**  
@@ -145,7 +145,7 @@ implementadas junto con capturas de pantalla.
 **Escenario negativo:**  
 - Intentar crear modelo sin dividir los datos:  
   Mensaje: “Primero, debe dividir los datos en conjuntos de entrenamiento y test”.  
-![Captura modelo error](images/error_no_division.png)
+![Captura modelo error](images/error_no_división.png)
 
 ## 6. Predicción
 **Escenarios positivos:**  
@@ -155,7 +155,7 @@ implementadas junto con capturas de pantalla.
 
 **Escenario negativo:**  
 - Ingresar texto en lugar de número → mensaje de error, no se realiza la predicción.  
-![Captura predicción error](images/prediccion_mal.png)
+![Captura predicción error](images/predicción_mal.png)
 
 ## 7. Guardado y carga de modelo
 **Escenario positivo:**  
